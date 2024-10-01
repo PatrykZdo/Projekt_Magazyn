@@ -1,0 +1,350 @@
+﻿@page "/locations"
+@using CarScrapyardWarehouse.Shared.Models;
+@using static MudBlazor.FilterOperator;
+@using Microsoft.AspNetCore.Components;
+@inject NavigationManager NavigationManage  
+<PageTitle>Locations</PageTitle>
+
+<style>
+   p, body, button {
+        font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif 20px;
+   }
+</style>
+
+<MudStack Style="padding-top: 75px; padding-bottom: 75px; padding-left: 150px; padding-right: 150px">
+    @if (!IsLoading)
+            {
+    <MudCard Elevation="3" Style="padding-inline: 20px">
+        <MudCardContent>
+                <MudStack Row="true" Justify="Justify.Center" Style="display: flex; align-items: center">
+                    <MudText Typo="Typo.h4">Dodawanie lokalizacji</MudText>
+                    <MudIcon Icon="@Icons.Material.Filled.AddLocationAlt" Size="Size.Large" />
+                </MudStack>
+                <MudStack style="padding-top: 50px;" Row="true" Justify="Justify.Center">
+                    <MudChipSet Filter="true" Mandatory="true">
+                        <MudStack Row="true">
+                            <MudStack>
+                                <MudChip Label="true" Variant="Variant.Outlined" Size=Size.Large OnClick="@(() => ChangeValuesOfCheckboxes("Warehouse"))" Color="Color.Default" Style="padding-inline: 35px" Text="Magazyn">MAGAZYN</MudChip>
+                            </MudStack>
+                            <MudStack Style="padding-left: 25px; padding-right: 25px">
+                                <MudChip Label="true" Variant="Variant.Outlined" Text="Regały" Size=Size.Large Color="Color.Default" Style="padding-inline: 35px" OnClick="@(() => ChangeValuesOfCheckboxes("Area"))">REGAŁ</MudChip>
+                            </MudStack>
+                            <MudStack>
+                                <MudChip Label="true" Variant="Variant.Outlined" Text="Pozycje" Size=Size.Large Color="Color.Default" Style="padding-inline: 35px" OnClick="@(() => ChangeValuesOfCheckboxes("Position"))">POZYCJA</MudChip>
+                            </MudStack>
+                        </MudStack>
+                    </MudChipSet>
+                </MudStack>
+                @if (WarehouseCheckBox)
+                {
+                    <MudStack Style="padding-bottom: 20px;padding-top:30px" AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.h5" Style="font-weight: 500">Dodaj nowy magazyn</MudText>
+                    </MudStack>
+                    <MudStack style="padding: 30px 20px" Row="true" Justify="Justify.SpaceAround">
+                        <MudTextField @bind-Value="warehouse.WarehouseName" Label="Nazwa Magazynu" />
+                        <MudTextField @bind-Value="warehouse.WarehouseCode" Label="Kod Magazynu" />
+                    </MudStack>
+                }
+                @if (AreaCheckBox)
+                {
+                    <MudStack Style="padding-bottom: 20px;padding-top:30px" AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.h5" Style="font-weight: 500">Dodaj nowy regał</MudText>
+                    </MudStack>
+                    <MudSelect T="Warehouse" ValueChanged="setAreaWarehouseId" Placeholder="Wybierz magazyn" Required Label="Wybierz magazyn" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Outlined">
+                        @foreach (Warehouse item in SelectedWarehouses)
+                     {
+                            <MudSelectItem T="Warehouse" Value="@item">@item.WarehouseName</MudSelectItem>
+                     }
+
+                 </MudSelect>
+                    <MudStack style="padding-top: 50px;padding-bottom: 50px" Row="true" Justify="Justify.SpaceBetween">
+                        <MudTextField @bind-Value="area.AreaName" Label="Nazwa Regału" />
+                        <MudTextField @bind-Value="area.AreaCode" Label="Kod Regału" />
+                    </MudStack>
+                }
+                @if (PositionCheckBox)
+                {
+
+                    <MudStack Style="padding-bottom: 20px;padding-top:30px" AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.h5" Style="font-weight: 500">Dodaj nową pozycję</MudText>
+                    </MudStack>
+                    <MudSelect T="Warehouse"   Label="Wybierz magazyn" Placeholder="Wybierz magazyn" Required ValueChanged="filterAreasForCurrentWarehouseSelected" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Outlined" >
+                     @foreach (var item in SelectedWarehouses)
+                     {
+                            <MudSelectItem T="Warehouse" Value="@item">@item.WarehouseName</MudSelectItem>
+                     }
+                    </MudSelect>
+                    <MudSelect T="Area" ValueChanged="setPositionAreaId" Placeholder="Wybierz regał w magazynie" Required Label="Wybierz regał" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Outlined">
+                    @foreach (Area item in SelectedArea)
+                        {
+                            <MudSelectItem T="Area" Value="@item">@item.AreaName</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudStack style="padding-top: 50px;padding-bottom: 50px" Row="true" Justify="Justify.SpaceBetween">
+                        <MudTextField @bind-Value="position.PositionName" Label="Nazwa Pozycji" />
+                        <MudTextField @bind-Value="position.PositionCode" Label="Kod Pozycji" />
+                    </MudStack>
+                }
+                @if(ShowSuccessMessage)
+                {
+                    <MudAlert Severity="Severity.Success">@SuccessMessage</MudAlert>
+                }
+                @if(ShowFailMessage)
+                {
+                    <MudAlert Severity="Severity.Error">@FailMessage</MudAlert>
+                }
+                <MudStack Row="true" Style="margin-top:20px;" Justify="Justify.FlexEnd">
+                    <MudButton Variant="Variant.Filled" OnClick=@(()=> writemeshit()) Color="Color.Default" Style="margin:10px;">Reset</MudButton>
+                    <MudButton Variant="Variant.Filled" OnClick=@(()=> AddToDataBase()) EndIcon="@Icons.Material.Filled.Send" Style="margin:10px; background-color: #43A047; color: whitesmoke">Dodaj</MudButton>
+                </MudStack>
+
+                <MudStack Row="true" Justify="Justify.Center">
+
+
+            </MudStack>
+
+
+            <MudStack Row="true" Style="marging-top:20px;" Justify="Justify.FlexEnd">
+                </MudStack>
+        </MudCardContent>
+    </MudCard>
+    }
+    else
+    {
+        <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="height:100vh; width:100%;">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </MudStack>
+    }
+</MudStack>
+
+@code {
+    private int AreaId { get; set; }
+    public bool IsLoading { get; set; }
+    private int WarehouseId { get; set; }
+
+    public bool WarehouseCheckBox { get; set; } = true;
+    public bool AreaCheckBox { get; set; } = false;
+    public bool PositionCheckBox { get; set; } = false;
+
+    public string WarehouseName { get; set; }
+    public string WarehouseCode { get; set; }
+    public string AreaName { get; set; }
+    public string AreaCode { get; set; }
+    public string PositionName { get; set; }
+    public string PositionCode { get; set; }
+    public List<Warehouse> SelectedWarehouses = new List<Warehouse>();
+    public List<Area> SelectedAreas = new List<Area>();
+    public List<Area> SelectedArea = new List<Area>();
+    public string SuccessMessage { get; set; }
+    public string FailMessage { get; set; }
+    public bool ShowSuccessMessage { get; set; } = false;
+    public bool ShowFailMessage { get; set; } = false;
+    public bool IsWarehouseContainingAreas { get; set; } = true;
+    public static string nav = "/locations";
+
+
+    public Warehouse warehouse { get; set; } = new Warehouse();
+    public Area area { get; set; } = new Area();
+    public CarScrapyardWarehouse.Shared.Models.Position position { get; set; } = new CarScrapyardWarehouse.Shared.Models.Position();
+    public IWarehouseService warehouseService;
+    public IEnumerable<Warehouse> warehouses = new List<Warehouse>();
+    public IEnumerable<Area> areas = new List<Area>();
+    public IEnumerable<CarScrapyardWarehouse.Shared.Models.Position> positions = new List<CarScrapyardWarehouse.Shared.Models.Position>();
+
+    public Area tempArea = new Area();
+
+
+    public void setAreaWarehouseId(Warehouse currWarehouse)
+    {
+        area.IdWarehouse = currWarehouse.Id;
+    }
+    public void setAreaWarehouseId2(Warehouse currWarehouse)
+    {
+        area.IdWarehouse = currWarehouse.Id;
+        position.IdArea = 0;
+    }
+    public void setPositionAreaId(Area currArea)
+    {
+        position.IdArea = currArea.Id;
+    }
+    public void filterAreasForCurrentWarehouseSelected(Warehouse currWarehouse)
+    {
+        SelectedArea = SelectedAreas.Where(item => item.IdWarehouse == currWarehouse.Id).ToList();
+        IsWarehouseContainingAreas = true;
+        if(SelectedArea.Count() == 0)
+        {
+            tempArea.AreaName = "Magazyn nie posiada regałów";
+            SelectedArea.Add(tempArea);
+            IsWarehouseContainingAreas = false;
+        }
+        setAreaWarehouseId2(currWarehouse);
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsLoading = true;
+        await GetAllData();
+        IsLoading = false;
+    }
+
+    public void writemeshit()
+    {
+        Console.WriteLine("Warehouse Wartości");
+        Console.WriteLine(warehouse.WarehouseName);
+        Console.WriteLine(warehouse.WarehouseCode);
+
+
+        Console.WriteLine("Area Wartości");
+        Console.WriteLine(area.IdWarehouse);
+        Console.WriteLine(area.AreaName);
+        Console.WriteLine(area.AreaCode);
+    }
+
+    public async Task GetAllData()
+    {
+        try
+        {
+            await GetWarehouses();
+            await GetAreas();
+            await GetPositions();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+
+    public void ChangeValuesOfCheckboxes(string whichCheckbox){
+        FailMessage = "";
+        SuccessMessage = "";
+        ShowFailMessage =false;
+        switch(whichCheckbox)
+        {
+            case "Warehouse":
+                WarehouseCheckBox = true;
+                AreaCheckBox = false;
+                PositionCheckBox = false;
+                break;
+            case "Area":
+                WarehouseCheckBox = false;
+                AreaCheckBox = true;
+                PositionCheckBox = false;
+                break;
+            case "Position":
+                WarehouseCheckBox = false;
+                AreaCheckBox = false;
+                PositionCheckBox = true;
+                break;
+        }
+    } 
+    public async Task GetWarehouses()
+    {
+        warehouses = await WarehouseService.GetWarehouses();
+        foreach (var item in warehouses)
+        {
+            SelectedWarehouses.Add(item);
+            Console.WriteLine(item.Id + " " + item.WarehouseName + " " + item.WarehouseCode);
+        }
+    }
+    public async Task GetAreas()
+    {
+        areas = await WarehouseService.GetAreas();
+        foreach (var item in areas)
+        {
+            SelectedAreas.Add(item);
+            Console.WriteLine(item.Id + " " + item.AreaName + " " + item.AreaCode);
+        }
+    }
+    public async Task GetPositions()
+    {
+        positions = await WarehouseService.GetPositions();
+        foreach (var item in positions)
+        {
+            Console.WriteLine(item.Id + " " + item.PositionName + " " + item.PositionCode);
+        }
+    }
+    public async Task AddToDataBase()
+    {
+        ShowSuccessMessage = false;
+        ShowFailMessage = false;
+        try
+        {
+            if (WarehouseCheckBox)
+            {
+
+                if (string.IsNullOrWhiteSpace(warehouse.WarehouseName) == false && string.IsNullOrWhiteSpace(warehouse.WarehouseCode) == false)
+                {
+
+
+                    await WarehouseService.AddWarehouse(warehouse);
+                    SuccessMessage = "Pomyślnie dodano magazyn";
+                    ShowSuccessMessage = true;
+                    await Task.Delay(1200);
+                    RefreshPage();
+
+                }
+                else
+                {
+                    FailMessage = "Nie udało się dodać magazynu - wypełnij wszystkie pola!";
+                    ShowFailMessage = true;
+                }
+
+
+
+
+            }
+            else if (AreaCheckBox)
+            {
+                if ((area.IdWarehouse != 0) && string.IsNullOrWhiteSpace(area.AreaCode) == false && string.IsNullOrWhiteSpace(area.AreaName) == false)
+                {
+                    await WarehouseService.AddArea(area);
+                    SuccessMessage = "Pomyślnie dodano regał!";
+                    ShowSuccessMessage = true;
+                    await Task.Delay(1200);
+                    RefreshPage();
+                }
+                else
+                {
+                    FailMessage = "Nie udało się dodać regału - wypełnij wszystkie pola!";
+                    ShowFailMessage = true;
+                }
+
+            }
+            else if (PositionCheckBox)
+            {
+                if ((position.IdArea != 0) && string.IsNullOrWhiteSpace(position.PositionName) == false && string.IsNullOrWhiteSpace(position.PositionCode) == false)
+                {
+                    if (IsWarehouseContainingAreas == true)
+                    {
+                        await WarehouseService.AddPosition(position);
+                        SuccessMessage = "Pomyślnie dodano pozycję!";
+                        ShowSuccessMessage = true;
+                        await Task.Delay(1200);
+                        RefreshPage();
+                    }
+                    else
+                    {
+                        FailMessage = "Nie udało się dodać pozycji - nie można zapisać bez regału!";
+                        ShowFailMessage = true;
+                    }
+                }
+                else
+                {
+                    FailMessage = "Nie udało się dodać pozycji - wypełnij wszystkie pola!";
+                    ShowFailMessage = true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+
+
+    }
+    void RefreshPage() => NavigationManage.NavigateTo(NavigationManage.Uri, true);
+
+}

@@ -1,0 +1,762 @@
+﻿@page "/carparts"
+
+@using System.Net.Http.Json
+@using CarScrapyardWarehouse.Client.Interfaces
+@using CarScrapyardWarehouse.Client.Shared
+@using CarScrapyardWarehouse.Shared.Models
+@using MudExtensions
+@using Newtonsoft.Json
+@inject HttpClient httpClient
+@inject IJSRuntime JSRuntime
+@inject IDialogService DialogService
+
+<PageTitle>Wyszukaj części</PageTitle>
+
+    @if (!IsLoading)
+{
+    <MudDataGrid
+              Style="margin: 15px"
+              T="PartsData"
+              Items=@Elements
+              SortMode="SortMode.Multiple"
+              Filterable="true"
+              FilterMode="DataGridFilterMode.ColumnFilterRow"
+              QuickFilter="@_quickFilter"
+              Hover=true
+              MultiSelection=true
+              SelectedItemsChanged="@DataIntoQRFunc">
+        <ToolBarContent>
+                <MudText Class="w-auto" Typo="Typo.h6">Lista wszystkich części</MudText>
+                <MudSpacer />
+            <MudTextField @bind-Value="_searchString" 
+            Placeholder="Szukaj" 
+            Adornment="Adornment.Start" 
+            AdornmentIcon="@Icons.Material.Filled.Search" 
+            IconSize="Size.Medium"
+            Immediate=true
+            Class="mt-0"></MudTextField>
+            <MudTooltip Text="@(DataIntoQR.Count != 0 ? "Wydrukuj zaznaczone części" : "Zaznacz części do wydrukowania")" Placement="Placement.Left">
+                <MudButton OnClick="@(() => HandlePrintDisplay(DataIntoQR))" Disabled="@(DataIntoQR.Count == 0)"><MudIcon Icon="@Icons.Material.Filled.Print" /></MudButton>
+            </MudTooltip>
+    </ToolBarContent>
+
+    <Columns>
+            <HierarchyColumn T="PartsData" />
+            <SelectColumn T="PartsData" />
+            <PropertyColumn Property="x => x.Part" Title="Część">
+                <FilterTemplate>
+                        <MudTooltip Text="Filtruj części" Placement="Placement.Left">
+                    <MudIconButton OnClick="@(() => OpenFilter("Part"))" Icon="@Part_icon" Size="@Size.Small" />
+                        </MudTooltip>
+                    <MudPopover Open="@Part_filterOpen" AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter" Style="padding: 10px">
+                        <MudStack Spacing="0">
+                            <MudCheckBox T="bool" Label="Select All" Size="@Size.Small" Checked="@Part_selectAll" CheckedChanged="@PartSelectAll" />
+                            <MudStack Spacing="0" Style="overflow-y:auto;max-height:250px">
+                                @foreach (var item in context.Items.DistinctBy(x => x.Part).OrderBy(x => x.Part))
+                                {
+                                    <MudCheckBox T="bool" Label="@($"{item.Part} ({context.Items.Where(x => x.Part.Equals(item.Part)).Count()})")" Size="@Size.Small" Checked="@(Part_selectedItems.Contains(item))"
+                                                 CheckedChanged="@((value) => PartSelectedChanged(value, Elements.Where(x => x.Part == item.Part).ToHashSet()))" />
+                                }
+                            </MudStack>
+                            <MudStack Row="true">
+                                <MudButton Color="Color.Error" OnClick="@(() => CloseFilter("Part"))">Zamknij</MudButton>
+                                <MudButton Color="Color.Primary" OnClick="@(() => ApplyFilterAsync(context, "Part"))">Filtruj</MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudPopover>
+                </FilterTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Brand + ' ' + x.Model" Title="Marka i model">
+                <FilterTemplate>
+                    <MudTooltip Text="Filtruj marki" Placement="Placement.Left">
+                        <MudIconButton OnClick="@(() => OpenFilter("Brand"))" Icon="@Brand_icon" Size="@Size.Small" />
+                    </MudTooltip>
+                    <MudTooltip Text="Filtruj modele" Placement="Placement.Right">
+                        <MudIconButton Disabled="@(!isSingleBrandSelected)" OnClick="@(() => OpenFilter("Model"))" Icon="@Model_icon" Size="@Size.Small" />
+                    </MudTooltip>
+                    <MudPopover Open="@Brand_filterOpen" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopCenter" Style="padding: 10px">
+                        <MudStack Spacing="0">
+                            <MudCheckBox T="bool" Label="Select All" Size="@Size.Small" Checked="@Brand_selectAll" CheckedChanged="@BrandSelectAll" />
+                            <MudStack Spacing="0" Style="overflow-y:auto;max-height:250px">
+                                @foreach (var item in context.Items.DistinctBy(x => x.Brand).OrderBy(x => x.Brand))
+                                {
+                                    <MudCheckBox T="bool" Label="@($"{item.Brand} ({context.Items.Where(x => x.Brand.Equals(item.Brand)).Count()})")" Size="@Size.Small" Checked="@(Brand_selectedItems.Contains(item))"
+                                                 CheckedChanged="@((value) => BrandSelectedChanged(value, Elements.Where(x => x.Brand == item.Brand).ToHashSet()))" />
+                                }
+                            </MudStack>
+                            <MudStack Row="true">
+                                <MudButton Color="Color.Error" OnClick="@(() => CloseFilter("Brand"))">Zamknij</MudButton>
+                                <MudButton Color="Color.Primary" OnClick="@(() => ApplyFilterAsync(context, "Brand"))">Filtruj</MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudPopover>
+                    <MudPopover Open="@Model_filterOpen" AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter" Style="padding: 10px">
+                        <MudStack Spacing="0">
+                            <MudCheckBox T="bool" Label="Select All" Size="@Size.Small" Checked="@Model_selectAll" CheckedChanged="@ModelSelectAll" />
+                            <MudStack Spacing="0" Style="max-height:250px">
+                                @foreach (var item in context.Items.Where(x => x.Brand == selectedBrand).DistinctBy(x => x.Model).OrderBy(x => x.Model))
+                                {
+                                    <MudCheckBox T="bool" Label="@($"{item.Model} ({context.Items.Where(x => x.Model.Equals(item.Model)).Count()})")" Size="@Size.Small" Checked="@(Model_selectedItems.Contains(item))"
+                                                 CheckedChanged="@((value) => ModelSelectedChanged(value, Elements.Where(x => x.Model == item.Model && x.Brand == selectedBrand).ToHashSet()))" />
+                                }
+                            </MudStack>
+                            <MudStack Row="true">
+                                <MudButton Color="Color.Error" OnClick="@(() => CloseFilter("Model"))">Zamknij</MudButton>
+                                <MudButton Color="Color.Primary" OnClick="@(() => ApplyFilterAsync(context, "Model"))">Filtruj</MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudPopover>
+                </FilterTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property='x => x.Warehouse + " - " + x.Area + " - " + x.Position' Title="Miejsce na magazynie" >
+                <FilterTemplate>
+                    <MudStack Row="true" Class="d-flex justify-content-between">
+                        <MudStack Row="true" Class="d-flex justify-content-start">
+                            <MudTooltip Text="Filtruj magazyn" Placement="Placement.Bottom">
+                                <MudIconButton OnClick="@(() => OpenFilter("Warehouse"))" Icon="@Warehouse_icon" Size="@Size.Small" />
+                            </MudTooltip>
+                            <MudTooltip Text="Filtruj regał" Placement="Placement.Bottom">
+                                <MudIconButton Disabled="@(Warehouse_icon == Icons.Material.Outlined.FilterAlt)" OnClick="@(() => OpenFilter("Area"))" Icon="@Area_icon" Size="@Size.Small" />
+                            </MudTooltip>
+                            <MudTooltip Text="Filtruj pozycję na regale" Placement="Placement.Bottom">
+                                <MudIconButton Disabled="@(Area_icon == Icons.Material.Outlined.FilterAlt)" OnClick="@(() => OpenFilter("Position"))" Icon="@Position_icon" Size="@Size.Small" />
+                            </MudTooltip>
+                        </MudStack>
+                            @if (AnyFilterSelected())
+                            {
+                                <MudButton OnClick="@(() => ClearFilterAsync(context))">Czyść filtry</MudButton>
+                            }
+                        
+                    </MudStack>
+                    <MudPopover Open="@Warehouse_filterOpen" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" Style="padding: 10px">
+                        <MudStack Spacing="0">
+                            <MudCheckBox T="bool" Label="Select All" Size="@Size.Small" Checked="@Warehouse_selectAll" CheckedChanged="@WarehouseSelectAll" />
+                            <MudStack Spacing="0" Style="overflow-y:auto;max-height:250px">
+                                @foreach (var item in context.Items.DistinctBy(x => x.Warehouse).OrderBy(x => x.Warehouse))
+                                {
+                                    <MudCheckBox T="bool" Label="@item.Warehouse" Size="@Size.Small" Checked="@(Warehouse_selectedItems.Contains(item))"
+                                                 CheckedChanged="@((value) => WarehouseSelectedChanged(value, Elements.Where(x => x.Warehouse == item.Warehouse).ToHashSet()))" />
+                                }
+                            </MudStack>
+                            <MudStack Row="true">
+                                <MudButton Color="Color.Error" OnClick="@(() => CloseFilter("Warehouse"))">Zamknij</MudButton>
+                                <MudButton Color="Color.Primary" OnClick="@(() => ApplyFilterAsync(context, "Warehouse"))">Filtruj</MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudPopover>
+                    <MudPopover Open="@Area_filterOpen" AnchorOrigin="Origin.BottomCenter" TransformOrigin="Origin.TopCenter" Style="padding: 10px">
+                        <MudStack Spacing="0">
+                            <MudCheckBox T="bool" Label="Select All" Size="@Size.Small" Checked="@Area_selectAll" CheckedChanged="@AreaSelectAll" />
+                            <MudStack Spacing="0" Style="overflow-y:auto;max-height:250px">
+                                @foreach (var item in Warehouse_selectedItems.DistinctBy(x => x.Area).OrderBy(x => x.Area))
+                                {
+                                    <MudCheckBox T="bool" Label="@item.Area" Size="@Size.Small" Checked="@(Area_selectedItems.Contains(item))"
+                                                 CheckedChanged="@((value) => AreaSelectedChanged(value, Elements.Where(x => x.Area == item.Area).ToHashSet()))" />
+                                }
+                            </MudStack>
+                            <MudStack Row="true">
+                                <MudButton Color="Color.Error" OnClick="@(() => CloseFilter("Area"))">Zamknij</MudButton>
+                                <MudButton Color="Color.Primary" OnClick="@(() => ApplyFilterAsync(context, "Area"))">Filtruj</MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudPopover>
+                    <MudPopover Open="@Position_filterOpen" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Style="padding: 10px">
+                        <MudStack Spacing="0">
+                            <MudCheckBox T="bool" Label="Select All" Size="@Size.Small" Checked="@Position_selectAll" CheckedChanged="@PositionSelectAll" />
+                            <MudStack Spacing="0" Style="overflow-y:auto;max-height:250px">
+                                @foreach (var item in Area_selectedItems.DistinctBy(x => x.Position).OrderBy(x => x.Position))
+                                {
+                                    <MudCheckBox T="bool" Label="@item.Position" Size="@Size.Small" Checked="@(Position_selectedItems.Contains(item))"
+                                                 CheckedChanged="@((value) => PositionSelectedChanged(value, Elements.Where(x => x.Position == item.Position).ToHashSet()))" />
+                                }
+                            </MudStack>
+                            <MudStack Row="true">
+                                <MudButton Color="Color.Error" OnClick="@(() => CloseFilter("Position"))">Zamknij</MudButton>
+                                <MudButton Color="Color.Primary" OnClick="@(() => ApplyFilterAsync(context, "Position"))">Filtruj</MudButton>
+                            </MudStack>
+                        </MudStack>
+                    </MudPopover>
+                </FilterTemplate>
+            </PropertyColumn>
+    </Columns>
+    <ChildRowContent >
+		<MudCard>
+			<MudCardHeader>
+				<CardHeaderContent>
+					<MudText Typo="Typo.h5">@context.Item.Part</MudText>
+					<MudText Typo="Typo.h6">Id: @context.Item.Id, cena: @context.Item.Price zł</MudText>
+				</CardHeaderContent>
+			</MudCardHeader>
+			<MudCardContent>
+                <MudText Typo="Typo.body1">Przypisane auto: @context.Item.Brand @context.Item.Model - @context.Item.Year</MudText>
+                <MudText Typo="Typo.body1" Class="fw-bold mt-5">Zdjęcia</MudText>
+                <MudItem Class="mt-3">
+                    @foreach (var part in parts.Where(i => i.Id == context.Item.Id))
+                    {
+                        @foreach (var partImage in part.PartImages)
+                        {
+                                <MudImage Src="@(string.Format($"data:image/png;base64,{Convert.ToBase64String(partImage.IdImageNavigation.Image1)}"))" Alt="Vehicle's Photo" Elevation="25" Width="200" Height="150" Class="rounded-lg mx-3" />
+                        }
+                    }
+                </MudItem>
+				<MudSpacer />
+				<div style="align-content:center">
+				    <MudExpansionPanel Class="align-content-center fw-bold" Text="Opis części">
+                        <MudStack Row="true" Class="d-flex justify-content-between">
+                            <MudText>@context.Item.Description</MudText>
+                            <div id="@(($"printContent_{context.Item.Id}"))" class="to-print">
+                                <MudBarcode Value="@(ConvertToLink(context.Item))" Width="100" Height="100" BarcodeFormat="ZXing.BarcodeFormat.QR_CODE" />
+                            </div>
+                        </MudStack>
+
+				    </MudExpansionPanel>
+				</div>
+			</MudCardContent>
+		</MudCard>
+	</ChildRowContent>
+        <PagerContent>
+            <MudDataGridPager T="PartsData" RowsPerPageString="Liczba wierszy" InfoFormat="@infoFormat"/>
+        </PagerContent>
+    </MudDataGrid>
+} else
+{
+    <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="height:100vh; width:100%;">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    </MudStack>
+}
+
+@inject NavigationManager NavigationManager
+
+@code {
+
+    private bool open { get; set; }
+    private bool IsFiltersShown = false;
+    public bool IsLoading { get; set; }
+    public string _searchString;
+	private string infoFormat = "{first_item}-{last_item} z {all_items}";
+
+    public IEnumerable<Part> parts = new List<Part>();
+    public IEnumerable<Vehicle> cars = new List<Vehicle>();
+    public IEnumerable<Warehouse> warehouses = new List<Warehouse>();
+    public IEnumerable<CarScrapyardWarehouse.Shared.Models.Position> positions = new List<CarScrapyardWarehouse.Shared.Models.Position>();
+    public IEnumerable<Area> areas = new List<Area>();
+
+    private List<PartsData> Elements = new List<PartsData>();
+    public HashSet<PartsData> DataIntoQR = new HashSet<PartsData>();
+
+
+    // Initialization process
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsLoading = true;
+        await GetAllData();
+        IsLoading = false;
+    }
+
+    public async Task GetAllData()
+    {
+        try
+        {
+            await GetData();
+            Part_selectedItems = Elements.ToHashSet();
+            Part_filterItems = Elements.ToHashSet();
+            Brand_selectedItems = Elements.ToHashSet();
+            Brand_filterItems = Elements.ToHashSet();
+            Warehouse_selectedItems = Elements.ToHashSet();
+            Warehouse_filterItems = Elements.ToHashSet();
+            Model_selectedItems = Elements.ToHashSet();
+            Model_filterItems = Elements.ToHashSet();
+            Area_selectedItems = Elements.ToHashSet();
+            Area_filterItems = Elements.ToHashSet();
+            Position_selectedItems = Elements.ToHashSet();
+            Position_filterItems = Elements.ToHashSet();
+            _filterDefinition = new FilterDefinition<PartsData>
+                {
+                    FilterFunction = x => Part_filterItems.Contains(x) & 
+                    Brand_filterItems.Contains(x) & 
+                    Warehouse_filterItems.Contains(x) & 
+                    Model_filterItems.Contains(x) &
+                    Area_filterItems.Contains(x) &
+                    Position_filterItems.Contains(x)
+                };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+
+    public async Task GetData()
+    {
+        parts = await VehicleService.GetParts();
+        cars = await VehicleService.GetVehicles();
+        warehouses = await WarehouseService.GetWarehouses();
+        areas = await WarehouseService.GetAreas();
+        positions = await WarehouseService.GetPositions();
+
+        foreach (var part in parts.Where(p => p?.Archived != true))
+        {
+            if (part.IdVehicle != 0) // Sprawdź, czy część jest przypisana do pojazdu
+            {
+                var vehicle = cars.FirstOrDefault(c => c.Id == part.IdVehicle);
+                var position = positions.FirstOrDefault(p => p.Id == part.IdPosition);
+                var area = areas.FirstOrDefault(a => a.Id == position.IdArea);
+                var warehouse = warehouses.FirstOrDefault(w => w.Id == area.IdWarehouse);
+
+                var warehouseName = warehouse.WarehouseName;
+                var areaName = area.AreaName;
+                var positionName = position.PositionName;
+
+                if (vehicle != null) // Sprawdź, czy pojazd został znaleziony
+                {
+                    var brandName = vehicle.Brand;
+                    var modelName = vehicle.Model;
+
+                    var partData = new PartsData
+                        {
+                            Id = part.Id,
+                            Part = part.Name,
+                            Description = part.Description,
+                            Price = part.Price,
+                            Brand = brandName,
+                            Model = modelName,
+                            Year = vehicle.Year,
+                            Warehouse = warehouseName,
+                            Area = areaName,
+                            Position = positionName,
+                        };
+                    Elements.Add(partData);
+                }
+                else
+                {
+                    var partData = new PartsData
+                        {
+                            Id = part.Id,
+                            Part = part.Name,
+                            Description = part.Description,
+                            Price = part.Price,
+                            Brand = "Brak",
+                            Model = "",
+                            Warehouse = warehouseName,
+                            Area = areaName,
+                            Position = positionName,
+                        };
+                    Elements.Add(partData);
+                }
+            }
+        }
+    }
+
+    //Printing QRCodes functions
+
+    private void DataIntoQRFunc(HashSet<PartsData> items)
+    {
+        foreach (var item in DataIntoQR.ToList())
+        {
+            if (!items.Contains(item))
+            {
+                DataIntoQR.Remove(item);
+            }
+        }
+
+        foreach (var item in items)
+        {
+            DataIntoQR.Add(item);
+        }
+    }
+
+    protected string ConvertToLink(PartsData item)
+    {
+        var a = $"{NavigationManager.BaseUri}partdetails/{item.Id}";
+        return a;
+    }
+
+    private async Task PrintQRCode(List<string> paramsList)
+    {
+        await JSRuntime.InvokeVoidAsync("PrintQRCode", paramsList);
+    }
+
+    private void HandlePrintDisplay(HashSet<PartsData> data)
+    {
+        Console.WriteLine(DataIntoQR.Count);
+        var parameters = new DialogParameters();
+        parameters.Add(nameof(DialogPrintDisplay.DataIntoQR), data);
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, CloseOnEscapeKey = true };
+        DialogService.Show<DialogPrintDisplay>("Podgląd", parameters, options);
+    }
+
+    // Filter functions
+
+    private Func<PartsData, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        return x.Part?.ToLower().Contains(_searchString.ToLower()) == true ||
+               x.Brand?.ToLower().Contains(_searchString.ToLower()) == true ||
+               x.Model?.ToLower().Contains(_searchString.ToLower()) == true ||
+               x.Warehouse?.ToLower().Contains(_searchString.ToLower()) == true ||
+               x.Area?.ToLower().Contains(_searchString.ToLower()) == true ||
+               x.Position?.ToLower().Contains(_searchString.ToLower()) == true;
+    };
+
+
+    bool Part_filterOpen = false;
+    bool Brand_filterOpen = false;
+    bool Model_filterOpen = false;
+    bool Warehouse_filterOpen = false;
+    bool Area_filterOpen = false;
+    bool Position_filterOpen = false;
+
+    HashSet<PartsData> Part_selectedItems = new();
+    HashSet<PartsData> Brand_selectedItems = new();
+    HashSet<PartsData> Model_selectedItems = new();
+    HashSet<PartsData> Warehouse_selectedItems = new();
+    HashSet<PartsData> Area_selectedItems = new();
+    HashSet<PartsData> Position_selectedItems = new();
+
+    HashSet<PartsData> Part_filterItems = new();
+    HashSet<PartsData> Brand_filterItems = new();
+    HashSet<PartsData> Model_filterItems = new();
+    HashSet<PartsData> Warehouse_filterItems = new();
+    HashSet<PartsData> Area_filterItems = new();
+    HashSet<PartsData> Position_filterItems = new();
+
+    bool Part_selectAll = true;
+    bool Brand_selectAll = true;
+    bool Model_selectAll = true;
+    bool Warehouse_selectAll = true;
+    bool Area_selectAll = true;
+    bool Position_selectAll = true;
+
+    string Part_icon = Icons.Material.Outlined.FilterAlt;
+    string Brand_icon = Icons.Material.Outlined.FilterAlt;
+    string Model_icon = Icons.Material.Outlined.FilterAlt;
+    string Warehouse_icon = Icons.Material.Outlined.FilterAlt;
+    string Area_icon = Icons.Material.Outlined.FilterAlt;
+    string Position_icon = Icons.Material.Outlined.FilterAlt;
+
+    FilterDefinition<PartsData> _filterDefinition;
+
+    bool isSingleBrandSelected = false;
+    string selectedBrand = "";
+
+    void OpenFilter(string s)
+    {
+        switch (s)
+        {
+            case "Part":
+                Part_filterOpen = true;
+                break;
+            case "Brand":
+                Brand_filterOpen = true;
+                break;
+            case "Model":
+                Model_filterOpen = true;
+                break;
+            case "Warehouse":
+                Warehouse_filterOpen = true;
+                break;
+            case "Area":
+                Area_filterOpen = true;
+                break;
+            case "Position":
+                Position_filterOpen = true;
+                break;
+        }
+    }
+
+    void CloseFilter(string s)
+    {
+        switch (s)
+        {
+            case "Part":
+                Part_filterOpen = false;
+                break;
+            case "Brand":
+                Brand_filterOpen = false;
+                break;
+            case "Model":
+                Model_filterOpen = false;
+                break;
+            case "Warehouse":
+                Warehouse_filterOpen = false;
+                break;
+            case "Area":
+                Area_filterOpen = false;
+                break;
+            case "Position":
+                Position_filterOpen = false;
+                break;
+        }
+    }
+
+    private void PartSelectedChanged(bool value, HashSet<PartsData> item)
+    {
+        if (value)
+            Part_selectedItems.UnionWith(item);
+        else
+            Part_selectedItems = Part_selectedItems.Except(item).ToHashSet();
+
+        if (Part_selectedItems.Count == Elements.Count())
+            Part_selectAll = true;
+        else
+            Part_selectAll = false;
+    }
+
+
+    private void BrandSelectedChanged(bool value, HashSet<PartsData> item)
+    {
+        if (value)
+            Brand_selectedItems.UnionWith(item);
+        else
+            Brand_selectedItems = Brand_selectedItems.Except(item).ToHashSet();
+
+        if (Brand_selectedItems.Count == Elements.Count())
+            Brand_selectAll = true;
+        else
+            Brand_selectAll = false;
+
+        CheckSingleBrandSelection();
+    }
+
+    private void ModelSelectedChanged(bool value, HashSet<PartsData> item)
+    {
+        if (value)
+            Model_selectedItems.UnionWith(item);
+        else
+            Model_selectedItems = Model_selectedItems.Except(item).ToHashSet();
+
+        if (Model_selectedItems.Count == Elements.Count())
+            Model_selectAll = true;
+        else
+            Model_selectAll = false;
+    }
+
+    private void WarehouseSelectedChanged(bool value, HashSet<PartsData> item)
+    {
+        if (value)
+            Warehouse_selectedItems.UnionWith(item);
+        else
+            Warehouse_selectedItems = Warehouse_selectedItems.Except(item).ToHashSet();
+
+        if (Warehouse_selectedItems.Count == Elements.Count())
+            Warehouse_selectAll = true;
+        else
+            Warehouse_selectAll = false;
+    }
+
+    private void AreaSelectedChanged(bool value, HashSet<PartsData> item)
+    {
+        if (value)
+            Area_selectedItems.UnionWith(item);
+        else
+            Area_selectedItems = Area_selectedItems.Except(item).ToHashSet();
+
+        if (Area_selectedItems.Count == Elements.Count())
+            Area_selectAll = true;
+        else
+            Area_selectAll = false;
+    }
+
+    private void PositionSelectedChanged(bool value, HashSet<PartsData> item)
+    {
+        if (value)
+            Position_selectedItems.UnionWith(item);
+        else
+            Position_selectedItems = Position_selectedItems.Except(item).ToHashSet();
+
+        if (Position_selectedItems.Count == Elements.Count())
+            Position_selectAll = true;
+        else
+            Position_selectAll = false;
+    }
+
+    private async Task ClearFilterAsync(FilterContext<PartsData> context)
+    {
+        Part_filterOpen = false;
+        Part_selectedItems = Elements.ToHashSet();
+        Part_filterItems = Elements.ToHashSet();
+        Part_icon = Icons.Material.Outlined.FilterAlt;
+        Brand_filterOpen = false;
+        Brand_selectedItems = Elements.ToHashSet();
+        Brand_filterItems = Elements.ToHashSet();
+        Brand_icon = Icons.Material.Outlined.FilterAlt;
+        Model_filterOpen = false;
+        Model_selectedItems = Elements.ToHashSet();
+        Model_filterItems = Elements.ToHashSet();
+        Model_icon = Icons.Material.Outlined.FilterAlt;
+        Warehouse_filterOpen = false;
+        Warehouse_selectedItems = Elements.ToHashSet();
+        Warehouse_filterItems = Elements.ToHashSet();
+        Warehouse_icon = Icons.Material.Outlined.FilterAlt;
+        Area_filterOpen = false;
+        Area_selectedItems = Elements.ToHashSet();
+        Area_filterItems = Elements.ToHashSet();
+        Area_icon = Icons.Material.Outlined.FilterAlt;
+        Position_filterOpen = false;
+        Position_selectedItems = Elements.ToHashSet();
+        Position_filterItems = Elements.ToHashSet();
+        Position_icon = Icons.Material.Outlined.FilterAlt;
+        await context.Actions.ClearFilterAsync(_filterDefinition);
+    }
+
+    private async Task ApplyFilterAsync(FilterContext<PartsData> context, string s)
+    {
+        switch (s)
+        {
+            case "Part":
+                Part_filterOpen = false;
+                Part_filterItems = Part_selectedItems.ToHashSet();
+                Part_icon = Part_filterItems.Count == Elements.Count() ? Icons.Material.Outlined.FilterAlt : Icons.Material.Filled.FilterAlt;
+                await context.Actions.ApplyFilterAsync(_filterDefinition);
+                break;
+            case "Brand":
+                Brand_filterOpen = false;
+                Brand_filterItems = Brand_selectedItems.ToHashSet();
+                Brand_icon = Brand_filterItems.Count == Elements.Count() ? Icons.Material.Outlined.FilterAlt : Icons.Material.Filled.FilterAlt;
+                await context.Actions.ApplyFilterAsync(_filterDefinition);
+                break;
+            case "Model":
+                Model_filterOpen = false;
+                Model_filterItems = Model_selectedItems.ToHashSet();
+                Model_icon = Model_filterItems.Count == Elements.Count() ? Icons.Material.Outlined.FilterAlt : Icons.Material.Filled.FilterAlt;
+                await context.Actions.ApplyFilterAsync(_filterDefinition);
+                break;
+            case "Warehouse":
+                Warehouse_filterOpen = false;
+                Warehouse_filterItems = Warehouse_selectedItems.ToHashSet();
+                Warehouse_icon = Warehouse_filterItems.Count == Elements.Count() ? Icons.Material.Outlined.FilterAlt : Icons.Material.Filled.FilterAlt;
+                foreach (var item in Warehouse_filterItems)
+                {
+                    Console.WriteLine("filter: " + item.Warehouse);
+                }
+                foreach(var item in Warehouse_selectedItems)
+                {
+                    Console.WriteLine("selected: " + item.Warehouse);
+                }
+                await context.Actions.ApplyFilterAsync(_filterDefinition);
+                break;
+            case "Area":
+                Area_filterOpen = false;
+                Area_filterItems = Area_selectedItems.ToHashSet();
+                Area_icon = Area_filterItems.Count == Elements.Count() ? Icons.Material.Outlined.FilterAlt : Icons.Material.Filled.FilterAlt;
+                await context.Actions.ApplyFilterAsync(_filterDefinition);
+                break;
+            case "Position":
+                Position_filterOpen = false;
+                Position_filterItems = Position_selectedItems.ToHashSet();
+                Position_icon = Position_filterItems.Count == Elements.Count() ? Icons.Material.Outlined.FilterAlt : Icons.Material.Filled.FilterAlt;
+                await context.Actions.ApplyFilterAsync(_filterDefinition);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void PartSelectAll(bool value)
+    {
+        Part_selectAll = value;
+
+        if (value)
+        {
+            Part_selectedItems = Elements.ToHashSet();
+        }
+        else
+        {
+            Part_selectedItems.Clear();
+        }
+    }
+
+    private void BrandSelectAll(bool value)
+    {
+        Brand_selectAll = value;
+
+        if (value)
+        {
+            Brand_selectedItems = Elements.ToHashSet();
+        }
+        else
+        {
+            Brand_selectedItems.Clear();
+        }
+    }
+
+    private void ModelSelectAll(bool value)
+    {
+        Model_selectAll = value;
+
+        if (value)
+        {
+            Model_selectedItems = Elements.ToHashSet();
+        }
+        else
+        {
+            Model_selectedItems.Clear();
+        }
+    }
+
+    private void WarehouseSelectAll(bool value)
+    {
+        Warehouse_selectAll = value;
+
+        if (value)
+        {
+            Warehouse_selectedItems = Elements.ToHashSet();
+        }
+        else
+        {
+            Warehouse_selectedItems.Clear();
+        }
+    }
+
+    private void AreaSelectAll(bool value)
+    {
+        Area_selectAll = value;
+
+        if (value)
+        {
+            Area_selectedItems = Elements.ToHashSet();
+        }
+        else
+        {
+            Area_selectedItems.Clear();
+        }
+    }
+
+    private void PositionSelectAll(bool value)
+    {
+        Position_selectAll = value;
+
+        if (value)
+        {
+            Position_selectedItems = Elements.ToHashSet();
+        }
+        else
+        {
+            Position_selectedItems.Clear();
+        }
+    }
+
+    private void CheckSingleBrandSelection()
+    {
+        isSingleBrandSelected = Brand_selectedItems.Count == 1;
+        if (isSingleBrandSelected)
+        {
+            var selectedBrandName = Brand_selectedItems.First();
+            selectedBrand = selectedBrandName.Brand;
+        }
+    }
+
+    public bool AnyFilterSelected()
+    {
+        return Part_icon == Icons.Material.Filled.FilterAlt ||
+        Brand_icon == Icons.Material.Filled.FilterAlt ||
+        Model_icon == Icons.Material.Filled.FilterAlt ||
+        Warehouse_icon == Icons.Material.Filled.FilterAlt ||
+        Area_icon == Icons.Material.Filled.FilterAlt ||
+        Position_icon == Icons.Material.Filled.FilterAlt;
+    }
+}

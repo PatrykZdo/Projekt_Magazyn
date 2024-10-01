@@ -1,0 +1,185 @@
+﻿@page "/loginAllegro"
+@using CarScrapyardWarehouse.Shared.Models
+@using System.Net.Http.Json
+@using System.Net.Http
+@using Newtonsoft.Json
+@using System.Net.Http.Json;
+@using System.Text;
+@using System.Net.Http.Headers;
+@using System.Text.Json;
+@using System.Text.RegularExpressions;
+
+@inject HttpClient HttpClient
+
+
+
+
+
+@inject HttpClient HttpClient
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager MyNavigationManager
+
+<MudContainer Style="padding-top: 75px; padding-bottom: 75px; padding-left: 150px; padding-right: 150px">
+            @if (!LoadingData)
+            {
+                @if (!(IsLogged))
+                {
+                    <MudStack style="padding-top: 50px;padding-bottom: 50px;flex-wrap:wrap;" Row="true" Justify="Justify.SpaceEvenly">
+                        <div style="color: black;padding: 20px;text-align: center;font-size: 24px;font-weight: bold;">
+                            Zaloguj się do Allegro
+                        </div>
+                    </MudStack>
+                    <MudStack style="padding-top: 50px;padding-bottom: 50px;flex-wrap:wrap;" Row="true" Justify="Justify.Center">
+                        <MudButton Variant="Variant.Filled" OnClick="RedirectToAllegro" EndIcon="@Icons.Material.Filled.ArrowDownward" Style="background-color: #43a037; color: white; width: 200px; height: 60px;">
+                            Zaloguj się
+                        </MudButton>
+                    </MudStack>
+                }
+                else
+                {
+                    <MudStack style="padding-top: 50px;padding-bottom: 50px;flex-wrap:wrap;" Row="true" Justify="Justify.SpaceEvenly">
+                        <div style="color: black;padding: 20px;text-align: center;font-size: 24px;font-weight: bold;">
+                            Jesteś zalogowany!
+                        </div>
+                    </MudStack>
+                    <MudStack style="padding-top: 50px;padding-bottom: 50px;flex-wrap:wrap;" Row="true" Justify="Justify.SpaceEvenly">
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudField Label="Imię" Variant="Variant.Text">@userResponce.firstName</MudField>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudField Label="Nazwisko" Variant="Variant.Text">@userResponce.lastName</MudField>
+                        </MudItem>
+                    </MudStack>
+                    <MudStack style="padding-top: 50px;padding-bottom: 50px;flex-wrap:wrap;" Row="true" Justify="Justify.SpaceEvenly">
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudField Label="Login" Variant="Variant.Text">@userResponce.login</MudField>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudField Label="Email" Variant="Variant.Text">@userResponce.email</MudField>
+                        </MudItem>
+                    </MudStack>
+
+                }
+
+            }
+            else
+            {
+                <MudStack style="padding-top: 50px;padding-bottom: 50px;flex-wrap:wrap;" Row="true" Justify="Justify.Center">
+                    <MudProgressCircular Color="Color.Primary" Size=Size.Large Indeterminate="true" />
+                </MudStack>
+            }
+
+</MudContainer>
+
+
+
+@code {
+    bool IsLogged;
+    bool LoadingData;
+    string responseData;
+    string accessToken;
+    object requestData;
+    UserResponce userResponce = new UserResponce();
+    string[] splittedUrl;
+
+    public class TokenResponse
+    {
+        public string access_token { get; set; }
+        public string refresh_token { get; set; }
+    }
+    public class Company
+    {
+        public string Name { get; set; }
+        public string TaxId { get; set; }
+    }
+    public class UserResponce
+    {
+        public Company Company { get; set; }
+        public string firstName { get; set; }
+        public string email { get; set; }
+        public string lastName { get; set; }
+        public string login { get; set; }
+
+    }
+
+
+
+    string url = "https://allegro.pl.allegrosandbox.pl/auth/oauth/authorize?response_type=code&client_id=46646778f880494daac892af47f93131&redirect_uri=https://massive-buffalo-happily.ngrok-free.app/loginAllegro";
+    void RedirectToAllegro() => MyNavigationManager.NavigateTo(url, true);
+    public async void CheckIsUserLogged()
+    {
+        LoadingData = true;
+        await Task.Delay(500);
+        splittedUrl = MyNavigationManager.Uri.Split("code=");
+        var cookievalue = await HttpClient.GetStringAsync($"https://massive-buffalo-happily.ngrok-free.app/api/Allegro/PrevToken");
+        Console.WriteLine(cookievalue);
+        if (string.IsNullOrWhiteSpace(cookievalue))
+        {
+            if (splittedUrl.Length > 1)
+            {
+                LoadingData = true;
+                requestData = new { Code = splittedUrl[1] };
+                var response = await HttpClient.PostAsJsonAsync("https://massive-buffalo-happily.ngrok-free.app/api/Allegro/token", requestData);
+                Console.WriteLine(response);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var responseObject = System.Text.Json.JsonSerializer.Deserialize<TokenResponse>(responseContent);
+                accessToken = responseObject.access_token;
+                var recivedcode = splittedUrl[1];
+                if (response.IsSuccessStatusCode)
+                {
+                    IsLogged = true;
+                    // var allegroResponse = await response.Content.ReadFromJsonAsync<string>();
+                    userResponce = await GetUserInfo(accessToken);
+                    LoadingData = false;
+                }
+                else
+                {
+                    LoadingData = false;
+                }
+            }
+            else
+            {
+                bool IsLogged = false;
+                LoadingData = false;
+            }
+        }
+        else
+        {
+            IsLogged = true;
+            userResponce = await GetUserInfo(cookievalue);
+            LoadingData = false;
+        }
+        StateHasChanged();
+    }
+    public class PayloadData
+    {
+        public string Token { get; set; }
+    }
+
+    public async Task<UserResponce> GetUserInfo(string token)
+    {
+        try
+        {
+            requestData = new { Code = token };
+            var response = await HttpClient.GetStringAsync($"https://massive-buffalo-happily.ngrok-free.app/api/Allegro/profile?code={token}");
+            var userInfo = System.Text.Json.JsonSerializer.Deserialize<UserResponce>(response);
+            return userInfo;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return null;
+        }
+
+
+    }
+
+    protected async override void OnInitialized()
+    {
+
+            CheckIsUserLogged();
+    }
+    
+
+    
+}

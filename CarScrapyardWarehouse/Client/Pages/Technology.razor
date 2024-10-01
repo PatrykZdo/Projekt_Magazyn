@@ -1,0 +1,73 @@
+﻿@page "/Technology"
+@layout NotAuthorizedLayout
+@namespace MudBlazor
+@inject Microsoft.JSInterop.IJSRuntime JSRuntime
+
+<PageTitle> Parthub-Technology</PageTitle>
+<MudContainer >
+<MudGrid Class="d-flex justify-center">
+	<MudItem xs="5">
+		<MudStack Style="margin:20px" AlignItems="AlignItems.Center">
+			<MudImage Fluid="true" Width="400" Elevation="4"  Src="images/MudBlazor.png" Style="background-color:white" Class="rounded-3" ObjectPosition="ObjectPosition.Center" ObjectFit="ObjectFit.Fill"/>
+			<MudLink Href="https://mudblazor.com"  Underline="Underline.Hover" Color="Color.Dark" Typo="Typo.h4" Style="font-weight:bold; font-family: 'Courier New', monospace;justify-content:center text-align:center; z-index:2;"> MudBlazor </MudLink>
+			<MudText Typo="Typo.body2" Style="font-family: 'Courier New'; text-align:center; z-index:2;">
+				MudBlazor to otwarta biblioteka komponentów UI oparta na Material Design, stworzona specjalnie dla aplikacji Blazor.
+				Oferuje zestaw gotowych komponentów, które ułatwiają budowanie nowoczesnych i responsywnych interfejsów użytkownika w aplikacjach Blazor.
+			</MudText>
+		</MudStack>
+	</MudItem>
+	<MudItem xs="5">
+	<MudStack Style="margin:20px" AlignItems="AlignItems.Center">
+	<MudImage Fluid="true" Width="400" Elevation="4" Src="images/Okta.png" Style="background-color:white; width: 450px; height: 220px;" Class="rounded-3" ObjectPosition="ObjectPosition.Center" ObjectFit="ObjectFit.Fill"/>
+	<MudLink Href="https://www.okta.com"  Underline="Underline.Hover" Color="Color.Dark" Typo="Typo.h4" Style="font-weight:bold; font-family: 'Courier New', monospace;justify-content:center text-align:center; z-index:2;"> Okta </MudLink>
+	<MudText Typo="Typo.body2" Style="font-family: 'Courier New'; text-align:center; z-index:2;">
+Okta to kompleksowy system zarządzania tożsamością i dostępem, który oferuje szeroką gamę usług związanych z autoryzacją i uwierzytelnianiem.
+Jest wykorzystywany przez firmy do zabezpieczania dostępu do aplikacji, danych i usług, zapewniając jednocześnie bezpieczne i płynne doświadczenia użytkowników.
+	</MudText>
+	</MudStack>
+	</MudItem>
+	<MudItem xs="5">
+	<MudStack Style="margin:20px" AlignItems="AlignItems.Center">
+	<MudImage Fluid="true" Width="400" Elevation="4"  Src="images/PostgreSQL.png" Style="background-color:white" Class="rounded-3" ObjectPosition="ObjectPosition.Center" ObjectFit="ObjectFit.Fill"/>
+	<MudLink Href="https://www.sqlite.org"  Underline="Underline.Hover" Color="Color.Dark" Typo="Typo.h4" Style="font-weight:bold; font-family: 'Courier New', monospace;justify-content:center text-align:center; z-index:2;"> PostgreSQL </MudLink>
+	<MudText Typo="Typo.body2" Style="font-family: 'Courier New'; text-align:center; z-index:2;">
+PostgreSQL to zaawansowany, open-source'owy system zarządzania relacyjnymi bazami danych, który jest ceniony za swoją stabilność, zgodność ze standardami SQL oraz rozbudowane możliwości.
+Jest wykorzystywany zarówno w małych aplikacjach, jak i w dużych, złożonych systemach wymagających wysokiej wydajności i niezawodności.
+	</MudText>
+	</MudStack>
+	</MudItem>
+    <MudItem xs="5">
+	<MudStack  Style="margin:20px" AlignItems="AlignItems.Center" >
+	<MudImage Fluid="true" Width="400" Elevation="4" Height="280" Src="images/DotNet.png" Style="background-color:mediumpurple" class="rounded-3" ObjectPosition="ObjectPosition.Center" ObjectFit="ObjectFit.Fill"/>
+	<MudLink Href="https://dotnet.microsoft.com/en-us/"  Underline="Underline.Hover" Color="Color.Dark" Typo="Typo.h4" Style="font-weight:bold; font-family: 'Courier New', monospace;justify-content:center text-align:center; z-index:2;"> DotNet </MudLink>
+	<MudText Typo="Typo.body2" Style="font-family: 'Courier New'; text-align:center; z-index:2;">
+.NET to wszechstronna, open-source'owa platforma programistyczna stworzona przez Microsoft.
+Umożliwia tworzenie różnorodnych aplikacji, od desktopowych i mobilnych po webowe i chmurowe, z użyciem różnych języków programowania.
+	</MudText>
+	</MudStack>
+	</MudItem>
+	<MudItem xs="5">
+	<MudStack  AlignItems="AlignItems.Center">
+	<MudImage Fluid="true" Width="400" Elevation="4" Height="280" Src="images/Figma.jpg" class="rounded-3" ObjectPosition="ObjectPosition.Center" ObjectFit="ObjectFit.Fill"/>
+	<MudLink Href="https://www.figma.com"  Underline="Underline.Hover" Color="Color.Dark" Typo="Typo.h4" Style="font-weight:bold; font-family: 'Courier New', monospace;justify-content:center text-align:center; z-index:2;"> Figma </MudLink>
+	<MudText Typo="Typo.body2" Style="font-family: 'Courier New'; text-align:center; z-index:2;">
+Figma to popularne narzędzie do projektowania interfejsów użytkownika (UI) i doświadczeń użytkownika (UX), które działa w przeglądarce internetowej.
+Jest cenione przez projektantów za swoją wszechstronność, możliwość współpracy w czasie rzeczywistym i łatwość użycia.
+	</MudText>
+	</MudStack>
+	</MudItem>
+</MudGrid>
+</MudContainer>
+
+
+
+
+
+
+
+
+
+
+@code {
+
+}

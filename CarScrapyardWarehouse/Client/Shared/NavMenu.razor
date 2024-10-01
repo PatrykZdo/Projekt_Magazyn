@@ -1,0 +1,88 @@
+﻿@inject NavigationManager Navigation
+@inject SignOutSessionStateManager SignOutManager
+
+<style>
+    .navLink {
+        color: #F5F5F5;  
+        font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif 20px;
+        font-weight: 700;
+
+        height: 48px;
+    }
+
+    Icon {
+        color: whitesmoke;
+    }
+
+    .iconNavLink {
+        margin-right: 8px;
+
+    }
+
+    .navLink:first-child {
+        margin-top: 5px;
+        margin-bottom: 2px;
+    }
+
+    .mud-nav-link:hover,
+    .active
+    {
+        color: #43A047;
+    }
+
+    .logout-container {
+        height: 48px;
+        background-color: #312D2D;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        padding-top: 6px;
+        padding-bottom: 6px
+    }
+
+    .logout-button:hover {
+        color: #43A047;
+    }
+
+    .logout-button {
+        background-color: transparent;
+        color: whitesmoke;
+        width: 100%;
+    }
+</style>
+
+<MudNavMenu Color=Color.Inherit Bordered Style="height: 100vh; background-color: #312D2D;">
+     <MudNavLink Class="navLink" ActiveClass="active" Icon="@Icons.Material.Filled.Home" IconColor="Color.Primary" Href="/" Match="NavLinkMatch.All">Strona główna</MudNavLink>
+     <AuthorizeView>
+         <MudNavLink Class="navLink" ActiveClass="active" Icon="@Icons.Material.Filled.AddLocation" IconColor="Color.Primary" Href="/locations" Match="NavLinkMatch.Prefix">Dodawanie lokalizacji</MudNavLink>
+         <MudNavLink Class="navLink" ActiveClass="active" Icon="@Icons.Material.Filled.AddShoppingCart" IconColor="Color.Primary" Href="/fetchdata" Match="NavLinkMatch.Prefix">Przyjęcie pojazdu</MudNavLink>
+         <MudNavLink Class="navLink" ActiveClass="active" Icon="@Icons.Material.Filled.DirectionsCar" IconColor="Color.Primary" Href="/carlist" Match="NavLinkMatch.Prefix">Wszystkie pojazdy</MudNavLink>
+         <MudNavLink Class="navLink" ActiveClass="active" Icon="@Icons.Material.Filled.AddCircle" IconColor="Color.Primary" Href="/reciving-material" Match="NavLinkMatch.Prefix">Przyjęcie części</MudNavLink>
+         <MudNavLink Class="navLink" ActiveClass="active" Icon="@Icons.Material.Filled.Build" IconColor="Color.Primary" Href="/carparts" Match="NavLinkMatch.Prefix">Wszystkie części</MudNavLink>
+         <MudNavLink Class="navLink" ActiveClass="active" Icon="@Icons.Material.Filled.Info" IconColor="Color.Primary" Href="/partdetails/1" Match="NavLinkMatch.Prefix">Szczegóły części</MudNavLink>
+         <MudNavLink Class="navLink" ActiveClass="active" Icon="@Icons.Material.Filled.ShoppingBag" IconColor="Color.Primary" Href="/loginAllegro" Match="NavLinkMatch.Prefix">Logowanie do Allegro</MudNavLink>
+         <MudNavLink Class="navLink" ActiveClass="active" Icon="@Icons.Material.Filled.BarChart" IconColor="Color.Primary" Href="/statistics" Match="NavLinkMatch.Prefix">Statystyki</MudNavLink>
+         <MudNavGroup Class="navLink fw-normal" Icon="@Icons.Material.Filled.Archive" IconColor="Color.Primary" Title="Archiwum" Expanded="false">
+             <MudNavLink Class="navLink" Href="/archiveVehicles" Icon="@Icons.Material.Filled.Flag" IconColor="Color.Primary" Match="NavLinkMatch.Prefix">Pojazdy</MudNavLink>
+             <MudNavLink Class="navLink" Href="/archiveParts" Icon="@Icons.Material.Filled.Flag" IconColor="Color.Primary" Match="NavLinkMatch.Prefix">Części</MudNavLink>
+        </MudNavGroup>
+     </AuthorizeView>
+</MudNavMenu>
+<MudDivider />
+ <div class="logout-container">
+     <button class="logout-button" @onclick="BeginSignOut"><MudIcon Icon="@Icons.Material.Filled.Logout" Style="margin-right: 5px"/>Wyloguj się</button>
+</div>
+ 
+
+
+ @code {
+    public static string Black { get; } = "#000000";
+
+    private string IsActive(string path) => Navigation.Uri.Contains(path) ? "active" : "";
+
+    private async Task BeginSignOut(MouseEventArgs args)
+    {
+        await SignOutManager.SetSignOutState();
+        Navigation.NavigateTo("authentication/logout");
+    }
+}

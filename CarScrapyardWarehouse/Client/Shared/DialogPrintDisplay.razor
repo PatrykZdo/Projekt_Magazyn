@@ -1,0 +1,66 @@
+﻿@using MudExtensions
+@using Newtonsoft.Json
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<style>
+
+    .qrcode-text {
+        font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif 20px;
+        font-weight: 700;
+        font-size: 12px;
+    }
+
+    .printing-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        grid-column-gap: 15px;
+        grid-row-gap: 15px;
+    }
+
+    .barcode-container {
+        display: flex;
+        flex-direction: column;
+        overflow-wrap: break-word; /* Dodaj styl, aby umożliwić zawijanie tekstu */
+    }
+</style>
+
+<MudDialog>
+    <DialogContent>
+        <div class="printing-grid" id="printing-div">
+            @foreach (var item in DataIntoQR)
+            {
+                <div id="@(($"printContent_{item.Id}"))" class="barcode-container" style="display: inline-block; margin: 10px;">
+                    <MudBarcode Value="@(ConvertToLink(item))" Width="130" Height="130" BarcodeFormat="ZXing.BarcodeFormat.QR_CODE" />
+                    <div style="display: block; text-align: center;">
+                        <MudText Class="qrcode-text">ID: @item.Id</MudText>
+                            <MudText Class="qrcode-text">@item.Part</MudText>
+                        </div>
+                    </div>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="@(() => Submit("printing-div"))">Drukuj</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    [Parameter] public HashSet<PartsData> DataIntoQR { get; set; }
+
+    protected string ConvertToLink(PartsData item)
+    {
+        var a = $"{NavigationManager.BaseUri}partdetails/{item.Id}";
+        return a;
+    }
+
+    private async Task Submit(string barcodeId)
+    {
+        await JSRuntime.InvokeVoidAsync("PrintQRCode", barcodeId);
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

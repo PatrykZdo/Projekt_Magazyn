@@ -1,0 +1,124 @@
+﻿@page "/archiveParts"
+@using CarScrapyardWarehouse.Shared.Models;
+
+
+<PageTitle>Archiwum Części</PageTitle>
+
+@if (!isLoaded)
+{
+	<MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="height:100vh; width:100%;">
+			<MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+	</MudStack>
+}else{
+    <MudText Class="mt-8 d-flex justify-content-center align-items-center" Typo="Typo.h6">Archiwum Części</MudText>
+
+<MudDataGrid Style="margin:15px"
+             Items=@archivedParts
+             SortMode="SortMode.Multiple"
+             Filterable="false"
+             ReadOnly="true"
+             Hover=true
+             Class="mt-8">
+
+
+    <Columns>
+        <HierarchyColumn />
+        <PropertyColumn Property="x => x.Name" Title="Nazwa" />
+        <PropertyColumn Property="x => x.IdVehicle == null ? x.IdVehicle.ToString() : x.IdVehicleNavigation.Brand" Title="Marka" />
+        <PropertyColumn Property="x => x.IdVehicle == null ? x.IdVehicle.ToString()  : x.IdVehicleNavigation.Model" Title="Model" />
+        <PropertyColumn Property="x => x.Price" Title="Cena (w zł)" />
+        <PropertyColumn Property="x => x.InsertDate" Title="Data sprzedaży" />
+        <TemplateColumn CellClass="d-flex justify-end" Sortable="false" Filterable="false">
+            <CellTemplate>
+                <MudStack Row>
+                <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" @onclick="() => RestorePart(context.Item)">
+                    @if (!isDeleting)
+                        {
+                            <MudText>Przywróć</MudText>
+                        }
+                        else
+                        {
+                            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+                        }
+                    </MudButton>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+        <ChildRowContent>
+            <MudCard>
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        @if (context.Item.IdVehicle == null)
+                        {
+                            <MudText Typo="Typo.h6">@context.Item.Name - Brak danych</MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.h6">@context.Item.Name - @context.Item.IdVehicleNavigation.Brand @context.Item.IdVehicleNavigation.Model @context.Item.IdVehicleNavigation.Year</MudText>
+                        }
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Class="fw-bold">Miejsce Magazynowe: <span class="fw-normal"> @context.Item.IdPositionNavigation.PositionName (@context.Item.IdPositionNavigation.PositionCode) </span></MudText>
+                    <MudText Class="mt-3 fw-bold">Zdjęcia</MudText>
+                    <MudItem Class="mt-3">
+                        @foreach (var image in context.Item.PartImages)
+                        {
+                            <MudImage Src="@(string.Format($"data:image/png;base64,{Convert.ToBase64String(image.IdImageNavigation.Image1)}"))" Alt="Part's Photo" Elevation="25" Width="200" Height="150" Class="rounded-lg" />
+                        }
+                    </MudItem>
+                    <MudText Class="mt-3 fw-bold">Opis</MudText>
+                    <MudText> @context.Item.Description</MudText>
+                </MudCardContent>
+            </MudCard>
+        </ChildRowContent>
+    
+    <PagerContent>
+        <MudDataGridPager T="Part"  RowsPerPageString="Liczba wierszy" InfoFormat="@infoFormat"/>
+    </PagerContent>
+</MudDataGrid>
+}
+
+@code {
+
+    public List<Part> archivedParts = new List<Part>();
+    public List<Part> allParts = new List<Part>();
+    public String emptyName = "";
+    public Boolean isLoaded = false;
+    public Boolean isDeleting = false;
+    private string infoFormat = "{first_item}-{last_item} z {all_items}";
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        await GetAllArchivedParts();
+        isLoaded = true;
+    }
+
+    public async Task RestorePart(Part part)
+    {
+        isDeleting = true;
+        part.Archived = false;
+        await VehicleService.UpdatePart(part);
+        await GetAllArchivedParts();
+        isDeleting = false;
+
+
+    }
+
+    public async Task GetAllArchivedParts()
+    {
+        archivedParts = (await VehicleService.GetArchivedParts()).ToList();
+        allParts = (await VehicleService.GetParts()).ToList();
+
+        foreach (var part in allParts)
+        {
+            if (part.Archived == true && part.IdVehicle == null)
+            {
+                archivedParts.Add(part);
+            }
+        }
+    }
+
+}

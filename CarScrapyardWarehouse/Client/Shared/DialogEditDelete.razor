@@ -1,0 +1,394 @@
+﻿@using CarScrapyardWarehouse.Shared.Models
+@using CarScrapyardWarehouse.Client.Interfaces
+@using CarScrapyardWarehouse.Client.Shared
+@using PositionModel = CarScrapyardWarehouse.Shared.Models.Position
+@inject ISnackbar SnackbarService
+
+<MudDialog Style="@(toEdit ? "width: 650px; height: 540px; padding: 20px;" : "padding: 20px")">
+        <TitleContent>
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@(toEdit ? Icons.Material.Filled.Edit : Icons.Material.Filled.DeleteForever)" Class="mr-3 mb-n1" />
+                @(toEdit ? "Edycja" : "Usuwanie")
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+        @if (toEdit)
+        {
+            @if (!IsLoading)
+            {
+                    <MudStack>
+                            <MudStack Row="true" Justify="Justify.FlexEnd">
+                                <MudTextField @bind-Value="@partName" Label="Nazwa części"/>
+                                <MudTextField @bind-Value="@partPrice" Label="Cena" Adornment="Adornment.End" AdornmentText="zł"/>
+                            </MudStack>
+                            <MudStack Style="margin: 20px 0">
+                                <MudTextField @bind-Value="@partDescription" Label="Opis części" Variant="Variant.Text" Lines="2" />
+                            </MudStack>
+
+                    <MudCheckBox @bind-Checked="@checkboxEmptyVehicle" Label="Część bez pojazdu"></MudCheckBox>
+
+                    @if (!showVehiclesToEdit)
+                    {
+                        <MudCheckBox @bind-Checked="@showVehiclesToEdit" Label="Edytuj przypisanie pojazdu" Disabled="@checkboxEmptyVehicle"></MudCheckBox>
+                    } else {
+                            <MudStack Row="true" Style="margin-top: 20px">
+                            <MudCheckBox @bind-Checked="@showVehiclesToEdit" CheckedIcon="@Icons.Material.Filled.Close" Color="Color.Error"></MudCheckBox>
+                                    <MudSelect T="Vehicle" ValueChanged="OnBrandChanged" Error="@IsErrorBrand" ErrorText="Proszę wybrać markę" Placeholder="@partsData.Brand" Required Label="Marka" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Text">
+                                         @foreach (Vehicle item in cars)
+                                        {
+                                            <MudSelectItem T="Vehicle" Value="@item">@item.Brand</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                <MudSelect T="Vehicle" ValueChanged="OnModelChanged" Error="@IsErrorModel" ErrorText="Proszę wybrać model" Placeholder="@partsData.Model" Required Label="Model" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Text" Disabled="@string.IsNullOrEmpty(selectedVehicle.Brand)">
+                                         @foreach (Vehicle item in filteredCarsForModels)
+                                        {
+                                            <MudSelectItem T="Vehicle" Value="@item">@item.Model</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                            <MudSelect T="Vehicle" ValueChanged="OnVINChanged" Error="@IsErrorVIN" ErrorText="Proszę wybrać VIN" Placeholder="Nr Vin" Required Label="Nr Vin" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Text" Disabled="@string.IsNullOrEmpty(selectedVehicle.Model)">
+                                         @foreach (Vehicle item in filteredModelsForVIN)
+                                        {
+                                            <MudSelectItem T="Vehicle" Value="@item">@item.Vin</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudStack>
+                            }
+                    @if (!showPositionsToEdit)
+                    {
+                        <MudCheckBox @bind-Checked="@showPositionsToEdit" Label="Edytuj przypisanie pozycji na magazynie"></MudCheckBox>
+                    } else {
+                        <MudStack Row="true" Style="margin-top: 20px">
+                            <MudCheckBox @bind-Checked="@showPositionsToEdit" CheckedIcon="@Icons.Material.Filled.Close" Color="Color.Error"></MudCheckBox>
+                            <MudSelect T="Warehouse" Label="Wybierz magazyn" Placeholder="Wybierz magazyn" Required Error="@IsErrorWar" ErrorText="Proszę wybrać magazyn!" ValueChanged="OnWarehouseChanged" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Text">
+                                 @foreach (var item in warehouses)
+                                {
+                                    <MudSelectItem T="Warehouse" Value="@item">@item.WarehouseName</MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudSelect T="Area" ValueChanged="OnAreaChanged" Error="@IsErrorArea" ErrorText="Proszę wybrać regał" Placeholder="Wybierz regał w magazynie" Required Label="Wybierz regał" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Text" Disabled="@string.IsNullOrEmpty(SelectedWarehouseName)">
+                                        @foreach (Area item in SelectedAreas)
+                                        {
+                                            <MudSelectItem T="Area" Value="@item">@item.AreaName</MudSelectItem>
+                                        }
+                            </MudSelect>
+
+                            <MudSelect T="PositionModel" ValueChanged="OnPositionChanged" Error="@IsErrorPos" ErrorText="Proszę wybrać pozycję" Placeholder="Wybierz pozycję w magazynie" Required Label="Wybierz pozycję" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Text" Disabled="@string.IsNullOrEmpty(SelectedAreaName)">
+                                 @foreach (PositionModel item in SelectedPositions)
+                                {
+                                    <MudSelectItem T="PositionModel" Value="@item">@item.PositionName</MudSelectItem>
+                                }
+                            </MudSelect>
+                            </MudStack>
+                        }                
+                    </MudStack>
+                   
+                
+            } else
+            {
+                <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="height:100vh; width:100%;">
+                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                </MudStack>
+            }
+        } else
+        {
+             <MudText>@ContentText</MudText>
+        }
+    </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Filled" OnClick="Cancel">Cofnij</MudButton>
+        @if (toEdit)
+        {
+            <MudButton Variant="Variant.Filled" Color="@Color" OnClick=Submit>@ButtonText</MudButton>
+        } else
+        {
+            @if(isCarToDelete){
+                <MudButton Variant="Variant.Filled" Color="@Color" OnClick="() => SubmitDeleteCar(partId)">@ButtonText</MudButton>
+            } else {
+                <MudButton Variant="Variant.Filled" Color="@Color" OnClick="() => SubmitDeletePart(partId)">@ButtonText</MudButton>
+            } 
+        }
+
+        </DialogActions>
+    </MudDialog>
+
+    @if (ShowSuccessMessage)
+    {
+        <MudAlert Severity="Severity.Success">Pomyślnie zaktualizowano daną część</MudAlert>
+    }
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    [Parameter] public PartsData partsData { get; set; } = new PartsData();
+
+    [Parameter] public string ContentText { get; set; }
+
+    [Parameter] public string ButtonText { get; set; }
+
+    [Parameter] public Color Color { get; set; }
+
+    [Parameter] public bool toEdit { get; set; } = false;
+
+    [Parameter] public bool isCarToDelete { get; set; } = false;
+
+    [Parameter] public int partId { get; set; } 
+
+    [Parameter] public string partName { get; set; }
+
+    [Parameter] public double? partPrice { get; set; }
+
+    [Parameter] public string partDescription { get; set; }
+
+    private Part partToUpdate { get; set; }
+
+    public IEnumerable<Vehicle> cars = new List<Vehicle>();
+    public IEnumerable<Warehouse> warehouses = new List<Warehouse>();
+    public IEnumerable<Area> areas = new List<Area>();
+    public IEnumerable<PositionModel> positions = new List<PositionModel>();
+
+    public List<Vehicle> filteredCarsForModels = new List<Vehicle>(); // Lista filtrowanych modeli dla wybranej marki
+    public List<Vehicle> filteredModelsForVIN = new List<Vehicle>(); // Lista filtrowanych nr vin dla wybranych aut
+    public List<Area> filteredAreas = new List<Area>(); // Lista dostępnych obszarów
+    public List<PositionModel> filteredPositions = new List<PositionModel>(); // Lista dostępnych pozycji
+
+    public List<Warehouse> SelectedWarehouses = new List<Warehouse>();
+    public List<Area> SelectedAreas = new List<Area>();
+    public List<PositionModel> SelectedPositions = new List<PositionModel>();
+
+    public Area tempArea = new Area();
+
+    public Vehicle selectedVehicle = new Vehicle();
+    public string SelectedWarehouseName = null;
+    public string SelectedAreaName = null;
+    public string SelectedPositionName = null;
+
+    public bool IsLoading = false;
+    public bool IsError { get; set; } = false;
+    public bool ShowSuccessMessage { get; set; } = false;
+    public bool showPositionsToEdit { get; set; } = false;
+    public bool showVehiclesToEdit { get; set; } = false;
+    public bool checkboxEmptyVehicle { get; set; } = false;
+
+    public bool IsErrorBrand { get; set; } = false;
+    public bool IsErrorModel { get; set; } = false;
+    public bool IsErrorVIN { get; set; } = false;
+    public bool IsErrorWar { get; set; } = false;
+    public bool IsErrorArea { get; set; } = false;
+    public bool IsErrorPos { get; set; } = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsLoading = true;
+        await GetAllData();
+        IsLoading = false;
+    }
+
+    public async Task GetAllData()
+    {
+        cars = await VehicleService.GetVehicles();
+        warehouses = await WarehouseService.GetWarehouses();
+        areas = await WarehouseService.GetAreas();
+        positions = await WarehouseService.GetPositions();
+        partToUpdate = await VehicleService.GetPartById(partsData.Id);
+
+        foreach (var item in areas)
+        {
+            SelectedAreas.Add(item);
+            Console.WriteLine(item.Id + " " + item.AreaName + " " + item.AreaCode);
+        }
+    }
+
+    void OnBrandChanged(Vehicle vehicle) 
+    {
+        selectedVehicle.Brand = vehicle.Brand;
+        filteredCarsForModels = cars.Where(item => item.Brand == vehicle.Brand).ToList();
+
+    }
+
+    void OnModelChanged(Vehicle vehicle)
+    {
+        selectedVehicle.Model = vehicle.Model;
+        filteredModelsForVIN = filteredCarsForModels.Where(item => item.Model == vehicle.Model).ToList();
+        IsErrorBrand = false;
+    }
+
+    void OnVINChanged(Vehicle vehicle)
+    {
+        selectedVehicle.Vin = vehicle.Vin;
+        IsErrorBrand = false;
+        IsErrorModel = false;
+    }
+
+    void OnWarehouseChanged(Warehouse warehouse)
+    {
+        SelectedWarehouseName = warehouse.WarehouseName;
+        SelectedAreas = areas.Where(item => item.IdWarehouse == warehouse.Id).ToList();
+
+        if (SelectedAreas.Count() == 0)
+        {
+            tempArea.AreaName = "Magazyn nie posiada regałów";
+            SelectedAreas.Add(tempArea);
+        }
+
+        SelectedPositions.Clear(); // Wyczyść wybrane pozycje, ponieważ zmieniono magazyn
+    }
+
+    void OnAreaChanged(Area area)
+    {
+        SelectedAreaName = area.AreaName;
+        SelectedPositions = positions.Where(item => item.IdArea == area.Id).ToList();
+        IsErrorWar = false;
+    }
+
+    void OnPositionChanged(PositionModel position)
+    {
+        SelectedPositionName = position.PositionName;
+        IsErrorWar = false;
+        IsErrorArea = false;
+    }
+
+    public int GetVehicleIdFromVin()
+    {
+        if (selectedVehicle != null)
+        {
+            foreach (var vehicle in cars)
+            {
+                if (vehicle.Vin == selectedVehicle.Vin)
+                {
+                    return vehicle.Id;
+                }
+            }
+        }
+        return -1;
+    }
+
+    public int GetPositionIdFromName()
+    {
+        if (positions != null && SelectedPositionName != null)
+        {
+            foreach (var position in positions)
+            {
+                if (position.PositionName == SelectedPositionName)
+                {
+                    return position.Id;
+                }
+            }
+        }
+        return -1;
+    }
+
+    public void setErrors()
+    {
+        IsErrorBrand = false;
+        IsErrorModel  = false;
+        IsErrorVIN  = false;
+        IsErrorWar  = false;
+        IsErrorArea  = false;
+        IsErrorPos  = false;
+    }
+
+    public bool checkErrors()
+    {
+        return IsErrorBrand || IsErrorModel || IsErrorVIN || IsErrorWar || IsErrorArea || IsErrorPos;
+    }
+
+    public async Task Submit(){
+
+        setErrors();
+
+        if (partToUpdate != null)
+        {
+            partToUpdate.Name = partName;
+            partToUpdate.Price = partPrice;
+            partToUpdate.Description = partDescription;
+
+            if (checkboxEmptyVehicle)
+            {
+                partToUpdate.IdVehicle = null;
+            }
+
+            if (showVehiclesToEdit)
+            {
+                if (selectedVehicle.Brand != null)
+                {
+                    if (selectedVehicle.Model != null)
+                    {
+                        if (selectedVehicle.Vin != null)
+                        {
+                            partToUpdate.IdVehicle = GetVehicleIdFromVin();
+                        }
+                        else
+                        {
+                            IsErrorVIN = true;
+                        }
+                    }
+                    else
+                    {
+                        IsErrorModel = true;
+                        IsErrorVIN = true;
+                    }
+                }
+                else
+                {
+                    IsErrorBrand = true;
+                    IsErrorModel = true;
+                    IsErrorVIN = true;
+                }
+            }
+
+            if (showPositionsToEdit)
+            {
+                if (SelectedWarehouseName != null)
+                {
+                    if (SelectedAreaName != null)
+                    {
+                        if (SelectedPositionName != null)
+                        {
+                            partToUpdate.IdPosition = GetPositionIdFromName();
+
+                        }
+                        else
+                        {
+                            IsErrorPos = true;
+                        }
+                    }
+                    else
+                    {
+                        IsErrorArea = true;
+                        IsErrorPos = true;
+                    }
+                }
+                else
+                {
+                    IsErrorWar = true;
+                    IsErrorArea = true;
+                    IsErrorPos = true;
+                }
+            }
+
+            if (!checkErrors())
+            {
+                await VehicleService.UpdatePart(partToUpdate);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+        }
+        
+        Console.WriteLine(partToUpdate.ToString());
+        Console.WriteLine(checkboxEmptyVehicle);
+    }
+
+    public async Task SubmitDeletePart(int id)
+    {
+        await VehicleService.DeletePart(id);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    public async Task SubmitDeleteCar(int id)
+    {
+        await VehicleService.DeleteVehicle(id);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

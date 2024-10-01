@@ -1,0 +1,48 @@
+﻿<style>
+	.divs-to-hold-radio{
+		flex-grow:1;
+		min-width:155px;
+		height:80px;
+		background:rgba(0,0,0,.09);
+		border-bottom:1px solid #BDBDBD;
+		border-top-left-radius:4px;
+		border-top-right-radius:4px;
+		display:flex;
+		flex-direction:column;
+		align-items:center;
+		justify:center;
+		margin-top:10px;
+		padding-top:10px;
+		color:rgba(138,138,138,1);
+		transition: background 0.3s ease;
+		transition: color 0.3s ease;
+	}
+
+	.divs-to-hold-radio:hover{
+		background:rgba(0,0,0,.13);
+		border-bottom:1px solid grey;
+		color:rgba(66,66,66,1);
+	}
+</style>
+
+	<div class="divs-to-hold-radio">
+		<MudText>@Title</MudText>
+			<MudRadioGroup @bind-SelectedOption="@Value">
+				<MudRadio @onchange="onOptionChange" Option="@("tak")" Size="Size.Small" >Tak</MudRadio>
+				<MudRadio @onchange="onOptionChange" Option="@("nie")" Size="Size.Small">Nie</MudRadio>
+			</MudRadioGroup>
+	</div>
+
+@code {
+	[Parameter]
+	public string Title { get; set; }
+	[Parameter]
+	public string Value { get;set; }
+	[Parameter]
+	public EventCallback<string>ValueChanged{ get; set; }
+
+	private Task onOptionChange(ChangeEventArgs e)
+	{
+		return ValueChanged.InvokeAsync(Value);
+	}
+}

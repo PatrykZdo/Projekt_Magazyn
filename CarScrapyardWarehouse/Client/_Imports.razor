@@ -1,0 +1,22 @@
+﻿@using System.Net.Http
+@using System.Net.Http.Json
+@using CarScrapyardWarehouse.Client.Interfaces;
+@using CarScrapyardWarehouse.Client.Services;
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using CarScrapyardWarehouse.Shared;
+@using Microsoft.JSInterop
+@using CarScrapyardWarehouse.Client
+@using CarScrapyardWarehouse.Client.Shared
+@using MudBlazor
+@using MudExtensions
+@using Attribute = CarScrapyardWarehouse.Shared.Models.Attribute;
+
+@inject IWarehouseService WarehouseService
+@inject IVehicleService VehicleService

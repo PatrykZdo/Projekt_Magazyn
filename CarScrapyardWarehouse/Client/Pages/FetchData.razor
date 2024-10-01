@@ -1,0 +1,825 @@
+﻿@page "/fetchdata"
+@using CarScrapyardWarehouse.Client.Models;
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using CarScrapyardWarehouse.Shared
+@using CarScrapyardWarehouse.Client.Services
+@using CarScrapyardWarehouse.Shared.Models
+@using System; 
+@using System.Collections; 
+@using System.Collections.Generic; 
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+
+<style>
+	.text-fields-and-select-field{
+		width:30%;
+	}
+	
+	.category-buttons{
+		justify-self:center;
+		align-self:center;
+		margin:50px 0px 50px 0px;
+	}
+
+	.attributes-field-width{
+		width:230px;
+	}
+
+</style>
+
+<PageTitle>Przyjęcie Pojazdu</PageTitle>
+@if (!isLoaded)
+{
+	<MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="height:100vh; width:100%;">
+			<MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+	</MudStack>
+}else{
+<MudStack Style="min-height:100vh; margin:40px 0px 40px 0px;" AlignItems="AlignItems.Center">
+	<MudCard Style="width:80%;">
+		<MudCardContent>
+
+			<MudStack	AlignItems="AlignItems.Center">
+				<MudText Typo="Typo.h5" Align="Align.Center">
+					Dodaj Pojazd
+					<MudIcon Icon="@Icons.Material.Filled.DirectionsCar" Title="Car"/>
+				</MudText>
+			</MudStack>
+
+
+			<MudStack Row="true" Justify="Justify.SpaceAround" Class="category-buttons flex-wrap" >
+				
+				@foreach(var vehicleType in vehicleTypes)
+				{
+							<MudButton Variant="@chengeVehicleTypeButtonStyle(vehicleType.Id)"  OnClick="@(() => changeVehicleType(vehicleType.Id))">@vehicleType.Type</MudButton>
+				}
+				<MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="OpenTypeOverlay"></MudIconButton>
+				
+				<MudOverlay @bind-Visible="isVisibleToggelTypeOverlay" DarkBackground="true" ZIndex="9999" >
+					<MudStack Style="background-color:#fff; height:200px; width:350px; border-radius:20px; padding-top:25px;padding-bottom:25px;" Justify="Justify.Center" AlignItems="AlignItems.Center"  >
+					<MudIconButton Icon="@Icons.Material.Outlined.Close" Color="Color.Error" OnClick="CloseTypeOverlay" Style="position:absolute; top:5px; right:5px;"></MudIconButton>
+						<MudTextField @bind-Value="newVehicleType.Type" Label="Typ Pojazdu" Variant="Variant.Filled"></MudTextField>
+						<MudStack Row="true">
+							<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveNewVehicleType">Zapisz</MudButton>
+							<MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="CloseTypeOverlay">Anuluj</MudButton>
+						</MudStack>
+					</MudStack>
+				</MudOverlay>
+
+			</MudStack>
+
+	@if(activeVehicleType != -9999){
+		<EditForm  Model="vehicle">
+					<MudTextField @bind-Value="vehicle.Vin" Label="Numer VIN" Variant="Variant.Filled" class="mud-rtr" Error="@(RequiredField)"></MudTextField>
+
+			<MudStack>
+				<MudStack Row="true" Style="flex-wrap:wrap;">
+					<MudTextField @bind-Value="vehicle.Brand" Label="Marka" Variant="Variant.Filled"  Style="min-width:150px" Error="@(RequiredField)" ></MudTextField>
+					<MudTextField @bind-Value="vehicle.Model" Label="Model" Variant="Variant.Filled"  Style="min-width:150px;" Error="@(RequiredField)"></MudTextField>
+					<MudSelect @bind-Value="vehicle.Year"  Label="Rocznik" Variant="Variant.Filled" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" Style="min-width:150px;">
+						@for (int? year = DateTime.Now.Year; year >1954 ; year--)
+						{
+							<MudSelectItem Value="@(year)"></MudSelectItem>
+						}
+					</MudSelect>
+					<MudTextField @bind-Value="vehicle.PurchasePrice" Label="Cena Zakupu" Variant="Variant.Filled" InputType="InputType.Number" Style="min-width:150px;" Error="@(RequiredField)"></MudTextField>
+				</MudStack>
+
+				<MudCard>
+					<MudCardContent>
+						<MudStack Justify="Justify.Center" AlignItems="AlignItems.Center">
+							<MudChipSet AllClosable="true">
+								@foreach (var attribute in chipAttribute)
+								{
+									<MudChip Variant="Variant.Text" Color="Color.Primary" Value="@(attribute.Item2.Value)" OnClose="DeleteAtrributeFromList">@(attribute.Item1): @(attribute.Item2.Value)</MudChip>	
+								}
+							</MudChipSet>
+
+							@if (!addingAttribute )
+							{			
+								<MudChip Variant="Variant.Text" Color="Color.Default" OnClick="OpenAddAttributeOverlay">Dodaj Atrybut<MudIcon Icon="@Icons.Material.Filled.Add"></MudIcon></MudChip>
+							}
+							else{
+								<MudStack Style="min-width:280px;max-width:380px; height:auto; border:1px solid rgba(33, 150, 243, 1); position:relative; border-radius:10px;" >
+									<MudIconButton Icon="@Icons.Material.Outlined.Close" Color="Color.Error" OnClick="CloseAddAttributeOverlay" Style="position:absolute; top:5px; right:5px;z-index:10;"></MudIconButton>
+									@if(!puste){
+										<MudSelect T="VehicleTypeAttribute" ValueChanged="changeValueAttributeToVehicle" Placeholder="Wybierz Atrybut"  Label="Wybierz atrybut" Style="margin:50px 20px 10px 20px">
+											@foreach(var attribute in vehicleAttributes){
+												if(!addedAttributes.Contains(attribute)){
+													<MudSelectItem Value="attribute"> @(attribute.IdAttributeNavigation.AttriburteName)</MudSelectItem>
+												}
+											}
+										</MudSelect>
+
+										@if (selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.Type == "Numeric" && puste == false){
+											if(staticValues.Count() < 1){
+												<MudTextField @bind-Value="attributeToVehicle.Value" Adornment="Adornment.End" AdornmentText="@(selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.Unit)" Placeholder="Podaj wartość (*Liczba)" InputType="InputType.Number"  Style="margin:10px 20px 10px 20px;" Error="@attributeToVehicleRequiredField" min="0" max="15000"></MudTextField>
+											}
+											else
+											{
+												<MudSelect T="String" @bind-Value ="attributeToVehicle.Value"  Label="*Typ Danych" Error="@attributeToVehicleRequiredField" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" Style="margin:0px 20px 10px 20px" Class="attributes-field-width" >
+													@if (!staticValues.Contains(selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.DefaultValue))
+													{
+														<MudSelectItem Value="@(selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.DefaultValue)">@(selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.DefaultValue)</MudSelectItem>
+													}
+													@foreach(var staticValue in staticValues){
+														<MudSelectItem Value="@(staticValue)">@(staticValue)</MudSelectItem>
+													}
+												</MudSelect>		
+											}
+										}
+										else if (selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.Type == "String" && puste == false)
+										{
+											if(staticValues.Count() < 1){
+												<MudTextField @bind-Value="attributeToVehicle.Value" Adornment="Adornment.End" AdornmentText="@(selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.Unit)" Placeholder="Podaj wartość (*Tekst)" InputType="InputType.Text" Style="margin:10px 20px 10px 20px;" Error="@attributeToVehicleRequiredField" ></MudTextField>			
+											}
+											else
+											{
+												<MudSelect T="String" @bind-Value ="attributeToVehicle.Value"  Label="*Typ Danych" Error="@attributeToVehicleRequiredField"  AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" Style="margin: 0px 20px 10px 20px" Class="attributes-field-width" >
+													@if (!staticValues.Contains(selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.DefaultValue))
+													{
+														<MudSelectItem Value="@(selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.DefaultValue)">@(selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.DefaultValue)</MudSelectItem>
+													}
+													@foreach(var staticValue in staticValues){
+														<MudSelectItem Value="@(staticValue)">@(staticValue)</MudSelectItem>
+													}
+												</MudSelect>		
+											}
+										}
+										else if (selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.Type == "Boolean" && puste == false)
+										{
+											<MudStack Row="true" Justify="Justify.SpaceAround">
+												<MudRadioGroup T="String"  @bind-SelectedOption ="attributeToVehicle.Value" Style="margin:10px 20px 10px 20px;" Error="@attributeToVehicleRequiredField" >
+													<MudRadio T="String" Option="@("Tak")" Color="Color.Primary">Tak</MudRadio>
+													<MudRadio T="String" Option="@("Nie")" Color="Color.Default">Nie</MudRadio>
+												</MudRadioGroup>
+											</MudStack>
+										}
+										<MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="margin-bottom:10px;">
+											<MudLink OnClick="OpenAttributeOverlay" Style="font-size:12px; " >Dodaj atrybut którego nie ma na liście</MudLink>
+										</MudStack>	
+									}
+									else{
+										<MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="margin:50px 0px 20px 0px;">
+											<MudLink OnClick="OpenAttributeOverlay" Style="font-size:12px; " >Dodaj atrybut którego nie ma na liście</MudLink>
+										</MudStack>	
+									}
+									<MudStack Row="true" Justify="Justify.SpaceAround"n Style="margin-bottom: 20px;" >
+										<MudButton Color="Color.Primary" OnClick="SaveAttributeVehile" >Dodaj</MudButton>
+										<MudButton Color="Color.Default" OnClick="CloseAddAttributeOverlay" >Anuluj</MudButton>
+									</MudStack>
+									
+								</MudStack>
+							}
+
+							<MudOverlay @bind-Visible="isVisibleToggelAttributeOverlay" DarkBackground="true" ZIndex="999" >
+								<MudStack Style="background-color:#fff; height:570px; width:350px; border-radius:20px; padding-top:25px;padding-bottom:25px;" Justify="Justify.Center" AlignItems="AlignItems.Center"  >
+									<MudIconButton Icon="@Icons.Material.Outlined.Close" Color="Color.Error" OnClick="CloseAttributeOverlay" Style="position:absolute; top:5px; right:5px;"></MudIconButton>
+											<MudStack Class="mt-5" Style=" overflow-x:auto;  max-width:280px ">
+										<MudTextField @bind-Value="newAttribute.AttriburteName" Label="*Nazwa Atrybutu" Error="@attributeRequiredFieldFilled" Variant="Variant.Filled" Class="attributes-field-width" ></MudTextField>
+										<MudSelect T="String" ValueChanged="funkcja"  Label="*Typ Danych" Error="@attributeRequiredFieldFilled" Variant="Variant.Filled" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" Style="z-index:1000;" Class="attributes-field-width" >
+												<MudSelectItem Value="@("Numeric")">Numeryczny</MudSelectItem>
+												<MudSelectItem Value="@("String")">Tekstowy</MudSelectItem>
+												<MudSelectItem Value="@("Boolean")">Tak/Nie</MudSelectItem>
+										</MudSelect>
+										@if( newAttribute.Type == "Numeric"){
+											<MudTextField @bind-Value="newAttribute.DefaultValue" Label="Wartość Domyślna" Variant="Variant.Filled" InputType="InputType.Number" min="0" Class="attributes-field-width" Disabled="@isBooleanType"></MudTextField>
+											<MudChipSet AllClosable="true" Style="max-width:220px;">
+												@foreach (var chip in staticValues)
+												{
+													<MudChip Variant="Variant.Text" Color="Color.Primary" Value="@(chip)" OnClose="DeleteStaticValue">
+														@if (chip.Length > 22)
+														{
+															@(chip.Substring(0, 20) + "...");
+														}
+														else
+														{
+															@(chip);
+														}
+													</MudChip>	
+												}	
+											</MudChipSet>
+											<MudTextField @bind-Value="newAttribute.StaticValues" Label="Wartości Listy" InputType="InputType.Number" Variant="Variant.Filled" Class="attributes-field-width" Disabled="@isBooleanType"></MudTextField>
+											<MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" aria-label="add_button" OnClick="AddStaticValue"></MudIconButton>
+										}
+										else{
+											<MudTextField @bind-Value="newAttribute.DefaultValue" Label="Wartość Domyślna" Variant="Variant.Filled" Class="attributes-field-width" Disabled="@isBooleanType"></MudTextField>
+														<MudChipSet AllClosable="true" Style="  max-width:220px;">
+												@foreach(var chip in staticValues){
+													<MudChip Variant="Variant.Text" Color="Color.Primary" Value="@(chip)" OnClose="DeleteStaticValue">
+														@if(chip.Length > 25){
+															@(chip.Substring(0, 22) + "...");
+														}
+														else
+														{
+															@(chip);			
+														}
+													</MudChip>	
+												}	
+											</MudChipSet>
+											<MudTextField @bind-Value="newAttribute.StaticValues" Label="Wartości Listy" Variant="Variant.Filled" Class="attributes-field-width" Disabled="@isBooleanType"></MudTextField>
+											<MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" aria-label="add_button" OnClick="AddStaticValue" Size="Size.Medium"></MudIconButton>
+										}
+										<MudTextField @bind-Value="newAttribute.Unit" Label="Jednostka Miary" Variant="Variant.Filled" Class="attributes-field-width" Disabled="@isBooleanType"></MudTextField>
+
+										<MudTextField @bind-Value="attributePriority" Label="Priorytet Atrybutu" Variant="Variant.Filled" InputType="InputType.Number" min="1" max="10" Class="attributes-field-width" ></MudTextField>
+										
+										<MudText Typo="Typo.h6" Class="attributes-field-width" Style="font-size:10px;" Color="Color.Primary">* Wymagane Pola</MudText>
+										<MudStack Row="true">
+											<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveNewAttribute">Zapisz</MudButton>
+											<MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="CloseAttributeOverlay">Anuluj</MudButton>
+										</MudStack>
+									</MudStack>
+								</MudStack>
+							</MudOverlay>
+
+						</MudStack>
+					</MudCardContent>
+				</MudCard>
+				
+
+
+				<MudStack>
+					<MudFileUpload	T="IReadOnlyList<IBrowserFile>"  
+									Accept="image/jpeg"
+									AppendMultipleFiles
+									OnFilesChanged="OnInputFileChanged"
+									Hidden="@false"
+									InputClass="absolute mud-width-full mud-height-full overflow-hidden z-20"
+									InputStyle="opacity:0;"
+									@ondragenter="@SetDragClass"
+									@ondragleave="@ClearDragClass"
+									@ondragend="@ClearDragClass">
+
+						<ButtonTemplate Context="anotherName">
+
+							<MudPaper MinHeight="300px" Outlined="true" Class="@_dragClass" Style="display:flex; flex-direction:column; align-items:center;">
+								<MudText Typo="Typo.h3">Dodaj Zdjęcie</MudText>
+								
+								<MudText Typo="Typo.h6">
+									@if (message != "")
+										{
+											<MudAlert Severity="Severity.Error">@message</MudAlert>
+										}
+								</MudText>
+								
+								<MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center" Style="margin-top:20px;flex-wrap:wrap;" Class="z-25">	
+									@if(_images.Count < 1)
+										{
+											<MudIcon Icon="@Icons.Material.Filled.Image" Title="Dodaj zdjęcia poglądowe samochodu" Style="font-size:100px"/>
+										}
+									@foreach (string URL in _imagesConvertedToBase64)
+										{
+											<MudButton Class="z-26">
+												<MudImage  ObjectFit="ObjectFit.Cover" Height="100" Width="100" Src="@URL" Alt="zdjęcie"  Elevation="25" Class="rounded-lg"/>											
+												<MudIconButton OnClick="() => DeleteImage(URL)" Icon="@Icons.Material.Filled.Delete" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Medium"  Class="z-30" Style="position:absolute; right:0px; top:0px;"/>
+											</MudButton>
+										}
+								</MudStack>
+
+
+							</MudPaper>
+						</ButtonTemplate>
+					</MudFileUpload>
+				</MudStack>
+			</MudStack>
+
+			<MudStack Row="true" Style="marging-top:20px;" Justify="Justify.FlexEnd">
+				<MudButton OnClick="Reset" Variant="Variant.Filled" Color="Color.Default" Style="margin:10px;">Wyczyść</MudButton>
+				<MudButton OnClick="SaveVehicle" Variant="Variant.Filled" Color="Color.Primary" Style="margin:10px;">Zapisz</MudButton>
+			</MudStack>
+		</EditForm>
+		}
+		
+	</MudCardContent>
+	</MudCard>
+</MudStack>
+}
+
+
+@code {
+	private const string defaultDragClass = "relative rounded-lg border-2 border-dashed pa-4 mt-4 mud-width-full mud-height-full z-25";   //zmienna odpowiadająca za styl drag and drop
+	private string _dragClass = defaultDragClass;
+
+	public String pomocna = "";		
+
+	private List<IBrowserFile> _images = new();
+	private List<string> _imagesConvertedToBase64 = new();		//zmienne do drag and dropa
+	public string imgSrc = "";
+	private byte[] _fileBytes = null;
+
+	public string message = "";						//zmienna w której znajduje się wiadomość z błędem podaczas dodawania zdjęć
+	private int activeVehicleType = -9999;			//zmienna która przechowuje informacje na temat który typ pojazdu jest aktualnie dodawany
+	private int attributePriority = 10;				//zmienna która przechowuje dane doyczące pozycjonowania atrybutu na liście (używana w formalurzu dodawania nowych atrybutów) 
+
+	public Boolean optionalProperties = false;		//zmienna pomocna do wyświatlania overlaya
+	public Boolean addingAttribute = false;         //zmienna pomocna do wyświatlania overlaya
+	public Boolean isLoaded = false;				//zmienna pomocna do wyświatlania kółka od ładowania danych 
+	public Boolean isVisibleToggelTypeOverlay = false;              //zmienna pomocna do wyświatlania overlaya
+	public Boolean isVisibleToggelAttributeOverlay = false;			//zmienna pomocna do wyświatlania overlaya
+	public Boolean attributeRequiredFieldFilled = false;			//zmienna pomocna do zmiany wyglądu field'a gdy wystąpił błąd
+	public Boolean attributeToVehicleRequiredField = false;			//zmienna pomocna do zmiany wyglądu field'a gdy wystąpił błąd
+	public Boolean isBooleanType = true;							//zmienna pomocna do sprawdzania czy dany atrybut jest typu Boolean
+	public Boolean puste = true;                                    //zmienna pomocna do sprawdzania czy dany atrybut jest typu Boolean
+	public Boolean RequiredField = false;
+	public int attribute = 0;								
+
+	public Attribute newAttribute = new Attribute();
+
+	public VehicleAttributeValue attributeToVehicle = new VehicleAttributeValue();
+
+	public List<Tuple<String, VehicleAttributeValue>> chipAttribute = new List<Tuple<String, VehicleAttributeValue>>();
+	public List<VehicleAttributeValue> addedAttributesToVehicles = new List<VehicleAttributeValue>();
+	public List<String> staticValues = new List<String>();
+
+	public IEnumerable<VehiclesType> vehicleTypes = new List<VehiclesType>();
+	public VehiclesType newVehicleType = new VehiclesType();
+
+	public VehicleTypeAttribute selectedAttributeInAddAttributeOverlay = new VehicleTypeAttribute();
+	public VehicleTypeAttribute vehicleTypeAttribute = new VehicleTypeAttribute();
+	public IEnumerable<VehicleTypeAttribute> vehicleTypeAttributes = new List<VehicleTypeAttribute>();
+	public List<VehicleTypeAttribute> addedAttributes = new List<VehicleTypeAttribute>();
+	public List<VehicleTypeAttribute> vehicleAttributes = new List<VehicleTypeAttribute>();
+
+
+	public Vehicle vehicle = new Vehicle();
+	public AuthenticationState authState;
+
+
+	protected override async Task OnInitializedAsync()
+	{
+
+		vehicleTypes = (await VehicleService.GetVehiclesTypes()).ToList();
+		vehicleTypeAttributes = (await VehicleService.GetVehicleTypeAttributes()).ToList();
+		authState = (await AuthenticationStateProvider.GetAuthenticationStateAsync());
+		isLoaded = true;
+
+
+	}
+
+
+	private void showOptionalProperties()
+	{
+		if (optionalProperties == false)
+		{
+			optionalProperties = true;
+		}
+		else if (optionalProperties == true)
+		{
+			optionalProperties = false;
+		}
+	}
+
+	private async void changeVehicleType(int id)
+	{
+		newAttribute.AttriburteName = null;
+		newAttribute.DefaultValue = null;
+		newAttribute.StaticValues = null;
+		newAttribute.Unit = null;
+		newAttribute.Type = null;
+		attributeRequiredFieldFilled = false;
+		vehicle.Year = null;
+		vehicle.User = null;
+		vehicle.Vin = null;
+		vehicle.Model = null;
+		vehicle.Brand = null;
+		vehicle.PurchasePrice = null;
+		attributeToVehicle.Value = null;
+		attributeToVehicleRequiredField = false;
+		RequiredField = false;
+		addingAttribute = false;
+		staticValues.Clear();
+		chipAttribute.Clear();
+		addedAttributes.Clear();
+
+
+		activeVehicleType = id;
+		vehicleAttributes.Clear();
+		vehicleAttributes = await VehicleService.GetVehicleTypeAttributeForType(activeVehicleType);
+		vehicleAttributes = vehicleAttributes.OrderBy(va => va.OrderNumber).ToList();
+		if(vehicleAttributes.Count == 0)
+		{
+			puste = true;
+		}
+		else
+		{
+			puste = false;
+			selectedAttributeInAddAttributeOverlay = vehicleAttributes.FirstOrDefault();
+		}
+
+
+
+
+	}
+
+	private Variant chengeVehicleTypeButtonStyle(int buttonNumber){
+		return activeVehicleType == buttonNumber ? Variant.Filled : Variant.Outlined;
+	}
+
+	private void funkcja(String name)
+	{
+		newAttribute.Type = name;
+		staticValues.Clear();
+		if(newAttribute.Type == "Boolean")
+		{
+			newAttribute.DefaultValue = null;
+			newAttribute.StaticValues = null;
+			newAttribute.Unit = null;
+			isBooleanType = true;
+		}
+		else
+		{
+			isBooleanType = false;
+		}
+
+	}
+
+	private void changeValueAttributeToVehicle(VehicleTypeAttribute attribute)
+	{
+		selectedAttributeInAddAttributeOverlay = attribute;
+		attributeToVehicleRequiredField = false;
+		if(selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.DefaultValue.Count() > 0){
+			attributeToVehicle.Value = selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.DefaultValue;
+		}
+		if (selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.StaticValues == "" || selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.StaticValues == null)
+		{
+			staticValues.Clear();
+		}
+		else
+		{
+			staticValues = selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.StaticValues.Split(";").ToList();
+		}
+	}
+
+	private async Task Clear()
+	{
+		_images.Clear();
+		ClearDragClass();
+		await Task.Delay(100);
+	}
+
+
+
+	public void DeleteImage( string url)
+	{
+		int index = _imagesConvertedToBase64.IndexOf(url);
+		_images.RemoveAt(index);
+		_imagesConvertedToBase64.RemoveAt(index);
+		StateHasChanged();
+	}
+
+
+
+	public async Task OnInputFileChanged(InputFileChangeEventArgs e)
+	{
+		ClearDragClass();
+		var files = e.GetMultipleFiles();
+		foreach (var file in files)
+		{
+
+			message = "";
+
+			if(_images.Count >= 8)
+			{
+				message = "Maksymalna liczba zdjęć które możesz dodać to 8";
+				resetMessage();
+				return;
+			}
+
+			string fileName = file.Name;
+			string fileExtension = System.IO.Path.GetExtension(fileName);
+
+			foreach(var name in _images)
+			{
+				if(fileName == name.Name)
+				{
+					message = "Zdjęcie o nazwie '" + fileName + "' jest już dodane ";
+					resetMessage();
+					return;
+				}
+			}
+
+			if(fileExtension != ".jpg")
+			{
+				message = "Plik musi mieć rozszerzenie .jpg";
+				resetMessage();
+				return;
+			}
+
+			_images.Add(file);
+			using(var ms = new MemoryStream())
+			{
+
+				await file.OpenReadStream(10 * 1024 * 1024).CopyToAsync(ms);
+				_fileBytes = ms.ToArray();
+				var photo = GetImage(Convert.ToBase64String(_fileBytes));
+				imgSrc = string.Format("data:image/jpg;base64,{0}", Convert.ToBase64String(photo));
+				_imagesConvertedToBase64.Add(imgSrc);				
+			}
+		}
+	}
+
+
+
+	public async Task resetMessage()
+	{
+		await Task.Delay(10000);
+		message="";
+		StateHasChanged();
+	}
+
+
+
+	public byte[] GetImage(string sBase64String)
+	{
+		byte[] bytes = null;
+
+		if (!string.IsNullOrEmpty(sBase64String))
+		{
+			bytes = Convert.FromBase64String(sBase64String);
+		}
+		return bytes;
+	}
+
+
+
+	private void Reset(){
+
+		message = "";
+		_imagesConvertedToBase64.Clear();
+		imgSrc = "";
+		_fileBytes = null;
+		vehicle.Year = null;
+		vehicle.User = null;
+		vehicle.Vin = null;
+		vehicle.Model = null;
+		vehicle.Brand = null;
+		vehicle.PurchasePrice = null;
+		RequiredField = false;
+
+		chipAttribute.Clear();
+		addedAttributes.Clear();
+		_images.Clear();
+	}
+
+	private void SetDragClass()
+		=> _dragClass = $"{defaultDragClass} mud-border-primary";
+
+
+	private void ClearDragClass()
+		=> _dragClass = defaultDragClass;
+
+
+
+	private async Task SaveNewVehicleType()
+	{
+		newVehicleType.Type = newVehicleType.Type.ToUpper();
+		await VehicleService.InsertVehiclesType(newVehicleType);
+		newVehicleType.Type = null;
+		isVisibleToggelTypeOverlay = false;
+		vehicleTypes = (await VehicleService.GetVehiclesTypes()).ToList();
+	}
+
+	private async Task SaveNewAttribute()
+	{
+		if(newAttribute.AttriburteName == null || newAttribute.AttriburteName == "" || newAttribute.Type == null)
+		{
+			attributeRequiredFieldFilled = true;
+		}else
+		{
+			newAttribute.StaticValues = "";
+			foreach(var staticValue in staticValues)
+			{
+				newAttribute.StaticValues = newAttribute.StaticValues + staticValue + ";";
+			}
+			newAttribute.StaticValues = newAttribute.StaticValues.ToUpper();
+			if(newAttribute.DefaultValue != null) newAttribute.DefaultValue = newAttribute.DefaultValue.ToUpper();
+			newAttribute.AttriburteName = newAttribute.AttriburteName.ToUpper();
+			Attribute attribute;
+			VehicleTypeAttribute newVehicleTypeAttribute = new VehicleTypeAttribute() ;
+			attribute = await VehicleService.InsertAttribute(newAttribute);
+			newVehicleTypeAttribute.IdAttribute = attribute.Id;
+			newVehicleTypeAttribute.IdVehiclesType = activeVehicleType;
+
+			if(attributePriority > 10)
+			{
+				attributePriority = 10;
+			}
+			else if(attributePriority < 1){
+				attributePriority = 1;
+			}
+			newVehicleTypeAttribute.OrderNumber = attributePriority;
+
+			await VehicleService.InsertVehicleTypeAttribute(newVehicleTypeAttribute);
+
+			newAttribute.AttriburteName = null;
+			newAttribute.DefaultValue = null;
+			newAttribute.StaticValues = null;
+			newAttribute.Unit = null;
+			newAttribute.Type = null;
+			attributeRequiredFieldFilled = false;
+			staticValues.Clear();
+
+			vehicleAttributes = await VehicleService.GetVehicleTypeAttributeForType(activeVehicleType);
+			vehicleAttributes = vehicleAttributes.OrderBy(va => va.OrderNumber).ToList();
+
+		}
+
+	}
+
+
+	private void SaveAttributeVehile()
+	{
+		if(attributeToVehicle.Value == null || attributeToVehicle.Value == "")
+		{
+			attributeToVehicleRequiredField = true;
+		}
+		else
+		{
+			chipAttribute.Add(new Tuple<string, VehicleAttributeValue>(selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.AttriburteName, new VehicleAttributeValue(selectedAttributeInAddAttributeOverlay.IdAttribute, attributeToVehicle.Value))); //tutaj przechowuje informacjie dotyczace id atrybutu oraz jaka wartość jest przypisana do tego atrybutu 
+			addedAttributes.Add(selectedAttributeInAddAttributeOverlay); //lista atrybutów które zostały dodane do aktualnie dodawanego auta
+
+			selectedAttributeInAddAttributeOverlay = vehicleAttributes.FirstOrDefault();
+
+			attributeToVehicle.Value = null;
+			attributeToVehicleRequiredField = false;
+			CloseAddAttributeOverlay();
+		}
+		StateHasChanged();
+	}
+
+	private async Task SaveVehicle()
+	{
+		if (vehicle.Brand == null || vehicle.Brand == "" || vehicle.Model == null || vehicle.Model == "" || vehicle.Vin == null || vehicle.Vin == "" || vehicle.PurchasePrice == null || vehicle.PurchasePrice == 0)
+		{
+			RequiredField = true;
+			return;
+
+		}
+
+		var user = authState.User;																	//pobieranie nazwy uzytkownika
+
+		Vehicle newVehicle ;
+
+		vehicle.IdType = activeVehicleType;															//
+		vehicle.InsertDate = DateTime.Now;															//
+		vehicle.User = user.Identity.Name;     
+		vehicle.Brand = vehicle.Brand.ToUpper();
+		vehicle.Model =	vehicle.Model.ToUpper();
+		vehicle.Vin = vehicle.Vin.ToUpper();
+		newVehicle = await VehicleService.InsertVehicle(vehicle);									//wstawienie nowego samochodu (Marka, Model, Vin, Rocznik)
+
+
+		foreach(var attribute in chipAttribute)														
+		{
+			VehicleAttributeValue vehicleAttributeValue = new VehicleAttributeValue();				//
+			vehicleAttributeValue.IdAttribute = attribute.Item2.IdAttribute;						//
+			vehicleAttributeValue.Value = attribute.Item2.Value.ToUpper();									//wstawianie wszystkich attrybutów które są przypisane do tego samochodu
+			vehicleAttributeValue.IdVehicle = newVehicle.Id;										//
+																									//
+			await VehicleService.InsertVehicleAttributeValue(vehicleAttributeValue);				//
+		}
+
+
+		byte[] imageBytes = null;
+		foreach(var image in _images)
+		{
+			using(var ms = new MemoryStream())
+			{
+				await image.OpenReadStream(10 * 1024 * 1024).CopyToAsync(ms);
+				imageBytes = ms.ToArray();                                                          //
+				await VehicleService.AddImageToVehicle(newVehicle.Id, imageBytes);                  //Dodawanie zdjęć do samochodu
+			}					
+		}
+
+
+		vehicle.Year = null;
+		vehicle.User = null;
+		vehicle.Vin = null;
+		vehicle.Model = null;
+		vehicle.Brand = null;
+		vehicle.PurchasePrice = null;
+		RequiredField = false;
+
+		chipAttribute.Clear();
+		addedAttributes.Clear();
+		_images.Clear();
+		_imagesConvertedToBase64.Clear();
+
+		AddSnackbar("Pomyślnie przyjęto pojazd", Severity.Success);
+
+	}
+
+	private void AddStaticValue(){
+		if (newAttribute.StaticValues == null || newAttribute.StaticValues.Replace(" ", "").Length == 0 )
+		{
+			Console.WriteLine("Pusty string");
+		}
+		else if(staticValues.Contains(newAttribute.StaticValues)){
+			Console.WriteLine("Element jest już na liście");
+		}
+		else
+		{
+			staticValues.Add(new String(newAttribute.StaticValues));
+			newAttribute.StaticValues = "";
+		}
+	}
+
+	private void DeleteStaticValue(MudChip c){
+		staticValues.Remove(c.Value.ToString());
+	}
+
+	private void OpenAddAttributeOverlay()
+	{
+		addingAttribute = true;
+		if(vehicleAttributes.Count == 0)
+		{
+			puste = true;
+		}
+		else
+		{
+			puste = false;
+		}
+
+		selectedAttributeInAddAttributeOverlay.IdAttributeNavigation.Unit = null;
+
+
+		StateHasChanged();
+	}
+
+
+	private void CloseAddAttributeOverlay()
+	{
+		addingAttribute = false;
+		StateHasChanged();
+	}
+
+
+	private void OpenTypeOverlay()
+	{
+		isVisibleToggelTypeOverlay = true;
+		StateHasChanged();
+	}
+
+
+	private void CloseTypeOverlay()
+	{
+		isVisibleToggelTypeOverlay = false;
+		newVehicleType.Type = null;
+		StateHasChanged();
+	}
+
+
+	private void OpenAttributeOverlay()
+	{
+		addingAttribute = false;
+		isVisibleToggelAttributeOverlay = true;
+
+		staticValues.Clear();
+		attributeToVehicle.Value = null;
+		StateHasChanged();
+	}
+
+
+	private void CloseAttributeOverlay()
+	{
+		isVisibleToggelAttributeOverlay = false;
+		attributeRequiredFieldFilled = false;
+		newAttribute.AttriburteName = null;
+		newAttribute.DefaultValue = null;
+		newAttribute.StaticValues = null;
+		newAttribute.Unit = null;
+		newAttribute.Type = null;
+		isBooleanType = false;
+		staticValues.Clear();
+		OpenAddAttributeOverlay();
+		StateHasChanged();
+	}
+
+
+	private async void DeleteAtrributeFromList(MudChip chip)
+	{
+		int idOfAttribute;
+
+		foreach (var a in chipAttribute.ToList())
+		{
+			if(a.Item2.Value == chip.Value )
+			{
+				idOfAttribute = a.Item2.IdAttribute;
+				chipAttribute.Remove(a);
+				addedAttributes.RemoveAll(g => g.IdAttribute == idOfAttribute);
+
+				selectedAttributeInAddAttributeOverlay = vehicleAttributes.FirstOrDefault();
+			}
+		}
+		StateHasChanged();
+	}
+
+	protected void AddSnackbar(string message, Severity severity)
+	{
+		Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+		Snackbar.Add(message, severity);
+	}
+
+	
+}

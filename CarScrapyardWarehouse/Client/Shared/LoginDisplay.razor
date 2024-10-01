@@ -1,0 +1,20 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+
+@inject NavigationManager Navigation
+@inject SignOutSessionStateManager SignOutManager
+
+<AuthorizeView>
+    <Authorized>
+        <a style="color: white;">Witaj, @context.User.Identity?.Name!</a>
+        <MudAvatar Style="color: #43A047; margin-left: 20px; border-color: #43A047" Variant="Variant.Outlined">@context.User.Identity?.Name![0]</MudAvatar>
+    </Authorized>
+    <NotAuthorized>
+        @* <a href="authentication/register">Register</a> *@
+        <a style="color: white;" href="authentication/login">Zaloguj się</a>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+
+}

@@ -1,0 +1,63 @@
+﻿<MudThemeProvider Theme="MyCustomTheme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    @if (context.User.Identity?.IsAuthenticated != true)
+                    {
+                        <RedirectToLogin />
+                    }
+                    else
+                    {
+                        <p role="alert">You are not authorized to access this resource.</p>
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
+        </Found>
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <MudGrid Justify="Justify.Center" Class="pt-16 w-90">
+                    <MudItem xs="12" Style="display: flex; justify-content: center;">
+                        <MudImage Width="500" Src="images/pagenotfound.png" />
+                    </MudItem>
+                    <MudSpacer />
+                    <MudSpacer />
+                    <MudSpacer />
+                    <MudItem xs="12" Style="display: flex; justify-content: center;">
+                        <MudButton Color="Color.Primary" StartIcon="@Icons.Material.Filled.ArrowLeft" OnClick="@(() => Navigation.NavigateTo("/"))" Variant="Variant.Filled">Przejdź do strony głównej.</MudButton>
+                    </MudItem>
+                </MudGrid>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+@inject NavigationManager Navigation
+
+@code {
+    MudTheme MyCustomTheme = new MudTheme()
+        {
+            Palette = new PaletteLight()
+            {
+                Primary = Colors.Green.Darken1,
+                Secondary = Colors.Grey.Lighten5,
+                White = Colors.Grey.Lighten5,
+                AppbarBackground = Colors.Shades.Black,
+            },
+            PaletteDark = new PaletteDark()
+            {
+                Primary = Colors.Blue.Lighten1
+            },
+
+            LayoutProperties = new LayoutProperties()
+            {
+                DrawerWidthLeft = "260px",
+                DrawerWidthRight = "300px"
+            }
+        };
+}

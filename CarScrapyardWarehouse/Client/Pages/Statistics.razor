@@ -1,0 +1,217 @@
+﻿@page "/statistics"
+@using System.Net.Http.Json
+@using CarScrapyardWarehouse.Client.Interfaces
+@using CarScrapyardWarehouse.Client.Shared
+@using CarScrapyardWarehouse.Shared.Models
+@inject IDialogService DialogService
+
+<style>
+	body {
+		overflow-x: hidden;
+	}
+</style>
+
+<PageTitle>Statistics</PageTitle>
+@if (Loaded)
+{
+	<MudContainer Style="margin:8px;padding:10px">
+	<MudStack Row="true" Style="margin-top:10px">
+	<MudDatePicker Label="Rok" PickerClosed="@((value) =>UpdateData())" @bind-Date="_year" OpenTo="OpenTo.Year" DateFormat="yyyy" FixDay="1" FixMonth="1"/>
+	<MudDatePicker Label="Miesiąc" PickerClosed="@((value) =>UpdateData())" @bind-Date="_month" OpenTo="OpenTo.Month" DateFormat="MM" FixDay="1" FixYear="1998"/>
+	</MudStack>
+	<MudGrid Style="margin: 10px">
+	<MudItem xs="12" sm="6">
+		<MudStack AlignItems="AlignItems.Center"  Class="d-flex align-center justify-center mud-width-full py-8">
+		   <MudText Align="Align.Center" Color="Color.Dark">Auta</MudText>
+		   <MudChart ChartType="ChartType.Donut" Width="300px" Height="300px" InputData="@AutaData" InputLabels="@AutaLabels"/>
+		   <MudText>Przyjete Auta : @AutaData[0]</MudText>
+		   <MudText>Rozebrane Auta : @AutaData[1]</MudText>
+		</MudStack>
+	</MudItem>
+	<MudItem xs="12" sm="6">
+		<MudStack AlignItems="AlignItems.Center"  Class="d-flex align-center justify-center mud-width-full py-8">
+			<MudText Align="Align.Center" Color="Color.Dark">Części</MudText>
+		   <MudChart ChartType="ChartType.Donut" Width="300px" Height="300px" InputData="@CzesciData" InputLabels="@CzesciLabels"/>
+		   <MudText>Wyciagniete Części : @CzesciData[0]</MudText>
+		   <MudText>Sprzedane Części : @CzesciData[1]</MudText>
+		</MudStack>
+	</MudItem>
+	<MudItem xs="12">
+		 <MudStack AlignItems="AlignItems.Center"  Class="d-flex align-center justify-center mud-width-full py-8">
+			<MudText Align="Align.Center" Color="Color.Dark">Bilans Aktywów</MudText>
+		   <MudChart ChartType="ChartType.Pie" InputData="@PartBalance" @bind-SelectedIndex="Index" InputLabels="@PartBalanceLabels" Width="300px" Height="300px">
+		   </MudChart>
+			  <MudPaper>
+				<MudText Color="Color.Error">Wartość wystawionych aktywów: @(PartBalance[0]+PartBalance[1])zł</MudText>
+				<MudText Color="Color.Success">Wartość sprzedanych aktywów: @PartBalance[2]</MudText>
+			   <MudDivider Style="margin: 20px" />
+			   <MudText Color="Color.Primary">Bilans ogólny: @(PartBalance[2]-(PartBalance[0]+PartBalance[1])) zł</MudText>
+			  </MudPaper>
+		   </MudStack>
+	</MudItem>
+</MudGrid>
+<MudDivider/>
+<MudText Align="Align.Center" Color="Color.Dark" Style="margin: 10px">Statystyki auta</MudText>
+	<MudStack AlignItems="AlignItems.Center" Row="true">
+		<MudStack AlignItems="AlignItems.Center" Style="width:300px;margin-top:100px">
+		<MudSelect T="Vehicle" Placeholder="Wybierz Auto" ValueChanged="UpdateCarData" Label="Wybierz Auto" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Filled" Style="width:200px">
+                         @foreach (Vehicle item in AllCars)
+                     {
+                            <MudSelectItem T="Vehicle" Value="@item">@item.Model @item.Year (@item.Vin)</MudSelectItem>
+                     }
+                    </MudSelect>
+					<MudPaper>
+						<MudText>Koszt auta: @WartoscAuto</MudText>
+						<MudText>Wartość czesci na stanie: @WartoscCzesci</MudText>
+						<MudDivider/>
+						<MudText>Sprzedane części: @Sprzedane</MudText>
+						<MudDivider/>
+						<MudText>Bilans: @Bilans</MudText>
+						<MudText>Potencjalny zarobek: @Potencj</MudText>
+					</MudPaper>
+					</MudStack>
+					<MudStack AlignItems="AlignItems.Stretch">
+						<MudDatePicker Label="Rok" PickerClosed="@((value) =>UpdateCarDataChart())" @bind-Date="_year_auto" OpenTo="OpenTo.Year" DateFormat="yyyy" FixDay="1" FixMonth="1"/>
+							<MudChart ChartType="ChartType.Bar" ChartOptions="@(new() { YAxisTicks = 2 })" ChartSeries="@Series"  XAxisLabels="@Miesiac"  Width="100%" Height="400px"/>
+					</MudStack>
+		</MudStack>
+		</MudContainer>
+} else
+{
+	<MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="height:100vh; width:100%;">
+		<MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+	</MudStack>
+}
+@code {
+	private IEnumerable<Vehicle> AllCars = new List<Vehicle>();
+	private IEnumerable<Vehicle> Cars = new List<Vehicle>();
+	private IEnumerable<Vehicle> Cars_Archived = new List<Vehicle>();
+
+	private IEnumerable<Part> AllParts = new List<Part>();
+	private IEnumerable<Part> Parts = new List<Part>();
+	private IEnumerable<Part> Parts_Archived = new List<Part>();
+
+	private bool Loaded = false;
+	private int Index = -1;
+
+
+	DateTime? _year = DateTime.Today;
+	DateTime? _month = DateTime.Today;
+	DateTime? _year_auto = DateTime.Today;
+
+
+	private Vehicle selectedCar;
+	private double? CarsValue,SoldCarsValue,PartsValue,SoldPartsValue;
+
+	private double[] PartBalance = {0 , 0, 0};
+	private string[] PartBalanceLabels = {"Wartość przyjętych Aut","Wartość wystawionych części" , "Wartość sprzedanych części"};
+	private double[] AutaData = {0, 0 };
+	private string[] AutaLabels = {"Przyjete Auta","Rozebrane Auta"};
+	private double[] CzesciData = {0,0 };
+	private string[] CzesciLabels = {"Wyciagniete Czesci","Rozebrane Auta"};
+	private string[] Miesiac = {"Sty.","Luty","Marzec","Kwie.","Maj","Czer.","Lipiec","Sier.","Wrze.","Paźdz.","List.","Grudz."};
+
+	private double WartoscAuto, WartoscCzesci, Sprzedane,Bilans,Potencj =0;
+
+	private List<ChartSeries> Series = new List<ChartSeries>()
+	{
+		new ChartSeries() { Name = "Ilość wystawionych cześci", Data= new double[12] {0,0,0,0,0,0,0,0,0,0,0,0}},
+		new ChartSeries() { Name = "Ilość sprzedanych cześci", Data= new double[12] {0,0,0,0,0,0,0,0,0,0,0,0}},
+	};
+
+
+	protected override async Task OnInitializedAsync()
+	{
+		await base.OnInitializedAsync();
+		AllCars = await VehicleService.GetVehicles();
+		Cars_Archived = await VehicleService.GetArchivedVehicles();
+		Cars = AllCars.Where(x => x.Archived != true);
+		AllParts = await VehicleService.GetParts();
+		Parts_Archived = await VehicleService.GetArchivedParts();
+		Parts = AllParts.Where(x => x.Archived != true);
+		UpdateData();
+		Loaded = true;
+	}
+
+
+	private void UpdateData()
+	{
+		var TCars = new double[2];
+		var TParts = new double[3];
+		var TCarsD = new double[2];
+		var TPartsD = new double[2];
+		CarsValue = 0;
+		SoldCarsValue = 0;
+		PartsValue = 0;
+		SoldPartsValue = 0;
+		/*foreach (var Car in Cars)
+			{
+			CarsValue = CarsValue + Car.PurchasePrice != null ? Car.PurchasePrice : 0;
+		}
+		foreach (var Car in Cars_Archived)
+			{
+			SoldCarsValue = SoldCarsValue + Car.PurchasePrice != null ? Car.PurchasePrice : 0;
+		}
+		foreach (var Part in Parts)
+			{
+			PartsValue = PartsValue + Part.Price != null ? Part.Price : 0;
+		}
+		foreach (var Part in Parts_Archived)
+			{
+			SoldPartsValue = SoldPartsValue + Part.Price != null ? Part.Price : 0;
+		}*/
+		CarsValue = Cars.Where(x => x.PurchasePrice != null && x.InsertDate.Year == _year.Value.Year && x.InsertDate.Month == _month.Value.Month).Sum(x =>x.PurchasePrice);
+		SoldCarsValue = Cars_Archived.Where(x => x.PurchasePrice != null && x.InsertDate.Year == _year.Value.Year && x.InsertDate.Month == _month.Value.Month).Sum(x =>x.PurchasePrice);
+		PartsValue = Parts.Where(x => x.Price != null && x.InsertDate.Year == _year.Value.Year && x.InsertDate.Month == _month.Value.Month).Sum(x => x.Price);
+		SoldPartsValue = Parts_Archived.Where(x => x.Price != null && x.InsertDate.Year == _year.Value.Year && x.InsertDate.Month == _month.Value.Month).Sum(x => x.Price);
+		TParts[1] = PartsValue.GetValueOrDefault(0);
+		TParts[2] = SoldPartsValue.GetValueOrDefault(0);
+		TParts[0] = CarsValue.GetValueOrDefault(0);
+		PartBalance = TParts;
+		Series.Clear();
+		TCarsD[0] = Cars.Where(x => x.InsertDate.Year == _year.Value.Year && x.InsertDate.Month == _month.Value.Month).Count();
+		TCarsD[1] = Cars_Archived.Where(x => x.InsertDate.Year == _year.Value.Year && x.InsertDate.Month == _month.Value.Month).Count();
+		TPartsD[0] = Parts.Where(x => x.InsertDate.Year == _year.Value.Year && x.InsertDate.Month == _month.Value.Month).Count();
+		TPartsD[1] = Parts_Archived.Where(x => x.InsertDate.Year == _year.Value.Year && x.InsertDate.Month == _month.Value.Month).Count();
+		AutaData = TCarsD;
+		CzesciData = TPartsD;
+
+		StateHasChanged();
+	}
+
+	private void UpdateCarData(Vehicle car)
+	{
+		selectedCar = car;
+		WartoscAuto = 0;
+		WartoscCzesci = 0;
+		Sprzedane = 0;
+		Bilans = 0;
+		Potencj = 0;
+
+		WartoscAuto = car.PurchasePrice.GetValueOrDefault(0) ;
+		WartoscCzesci = Parts.Where(x => x.IdVehicle == car.Id).Sum(x => x.Price).GetValueOrDefault(0);
+		Sprzedane = Parts_Archived.Where(x => x.IdVehicle == car.Id).Sum(x => x.Price).GetValueOrDefault(0);
+		Bilans = Sprzedane - WartoscAuto;
+		Potencj = (Sprzedane + WartoscCzesci) - WartoscAuto;
+		UpdateCarDataChart();
+	}
+	private void UpdateCarDataChart()
+	{
+		if (selectedCar != null)
+		{
+			var wystawionedata = new double[Miesiac.Length];
+			var sprzedanedata = new double[Miesiac.Length];
+			List<ChartSeries> TSeries = new List<ChartSeries>();
+			for (int i = 0; i < wystawionedata.Length; i++)
+			{
+				wystawionedata[i] = Parts.Where(x => x.IdVehicle == selectedCar.Id && x.Archived != true && x.InsertDate.Year == _year_auto.Value.Year && x.InsertDate.Month == i + 1).Count();
+				sprzedanedata[i] = Parts_Archived.Where(x => x.IdVehicle == selectedCar.Id && x.InsertDate.Year == _year_auto.Value.Year && x.InsertDate.Month == i + 1).Count();
+			}
+			TSeries.Add(new ChartSeries() { Name = "Ilość wystawionych cześci", Data = wystawionedata });
+			TSeries.Add(new ChartSeries() { Name = "Ilość sprzedanych cześci", Data = sprzedanedata });
+			Series = TSeries;
+			
+			StateHasChanged();
+		}
+	}
+}

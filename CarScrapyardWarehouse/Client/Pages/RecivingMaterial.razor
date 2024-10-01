@@ -1,0 +1,460 @@
+﻿@page "/reciving-material"
+@using CarScrapyardWarehouse.Shared.Models
+@using static MudBlazor.FilterOperator
+@using CarScrapyardWarehouse.Shared
+@using CarScrapyardWarehouse.Client.Services
+@using Microsoft.AspNetCore.Authorization
+@using System;
+@using System.Collections;
+@using System.Collections.Generic;
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@inject NavigationManager NavigationManage
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>RecivingMaterial</PageTitle>
+
+<MudStack Style="padding-top: 75px; padding-bottom: 75px; padding-left: 150px; padding-right: 150px">
+        <MudCard>
+            <MudCardContent>
+            <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h3">Przyjęcie Towaru</MudText>
+                <MudIcon Icon="@Icons.Material.Filled.Task" Size="Size.Large" />
+                </MudStack>
+                <MudStack style="padding-top: 100px;" Row="true" Justify="Justify.SpaceBetween">
+                    <MudStack style="width: 50vw">
+                    <MudSelect T="Vehicle" ValueChanged="OnCarSelection" Placeholder="Wybierz Auto" Required=!IsPartWipeoutCar Disabled=IsPartWipeoutCar Label="Wybierz Auto" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Filled">
+                         @foreach (Vehicle item in vehicles)
+                     {
+                            <MudSelectItem T="Vehicle" Value="@item">(@item.Vin) @item.Model @item.Year</MudSelectItem>
+                     }
+                    </MudSelect>
+                    </MudStack>
+                    <MudStack Style="padding-top: 15px; padding-right: 25px">
+                    <MudCheckBox @bind-Checked="@IsPartWipeoutCar" Size="Size.Medium" Label="Dodaję cześć która nie należy do auta z listy" />
+                    </MudStack>
+                </MudStack>
+            <MudStack style="padding-top: 50px;padding-bottom: 50px;flex-wrap:wrap;" Row="true" Justify="Justify.FlexStart">
+                    <MudSelect T="Warehouse" ValueChanged="filterAreasForCurrentWarehouseSelected" Placeholder="Wybierz magazyn" Required Label="Wybierz magazyn" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Filled">
+                             @foreach (Warehouse item in SelectedWarehouses)
+                            {
+                                <MudSelectItem T="Warehouse" Value="@item">@item.WarehouseName</MudSelectItem>
+                            }
+
+                    </MudSelect>
+                <MudSelect T="Area" Placeholder="Wybierz regał w magazynie" ValueChanged="filterPositionForCurrentAreaSelected" Required Label="Wybierz Regał" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Filled">
+                                @foreach (Area item in SelectedArea)
+                                {
+                                    <MudSelectItem T="Area" Value="@item">@item.AreaName</MudSelectItem>
+                                }
+                    </MudSelect>
+                <MudSelect T="CarScrapyardWarehouse.Shared.Models.Position" ValueChanged="setPositionId" Placeholder="Wybierz pozycję w magazynie" Required Label="Wybierz pozycję" AnchorOrigin="Origin.BottomCenter" Variant="Variant.Filled">
+                             @foreach (CarScrapyardWarehouse.Shared.Models.Position item in SelectedPosition)
+                            {
+                        <MudSelectItem T="CarScrapyardWarehouse.Shared.Models.Position" Value="@item">@item.PositionName</MudSelectItem>
+                            }
+                    </MudSelect>
+                </MudStack>
+                <MudStack style="padding-top: 50px;padding-bottom: 50px;flex-wrap:wrap;" Row="true" Justify="Justify.FlexStart">
+                    <MudTextField @bind-Value="part.Name" Required Label="Nazwa Produktu" Variant="Variant.Filled" Size />
+                    <MudTextField @bind-Value="part.Price" Label="Cena" Adornment="Adornment.End" AdornmentText="zł" Variant="Variant.Filled" />
+                </MudStack>
+                <MudStack Row="true" Justify="Justify.Center">
+
+
+                </MudStack>
+            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                            AppendMultipleFiles
+                            Hidden="@false"
+                            OnFilesChanged=OnDropFile
+                            InputClass="absolute mud-width-full mud-height-full overflow-hidden z-20"
+                            InputStyle="opacity:0"
+                            @ondragenter="@SetDragClass"
+                            @ondragleave="@ClearDragClass"
+                            @ondragend="@ClearDragClass">
+                            <ButtonTemplate>
+                    <MudPaper Height="300px"
+                              Outlined="true"
+                               Class="@_dragClass">
+                        <MudStack Row Justify="Justify.Center">
+                            <MudText Typo="Typo.h3" Style="font:bold">
+                                Dodaj zdjęcia
+                            </MudText>
+                         </MudStack>
+                            <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center" Style="margin-top:20px;flex-wrap:wrap;" Class="z-25">
+                                @if (_images.Count < 1)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Image" Title="Dodaj zdjęcia poglądowe samochodu" Style="font-size:100px" />
+                                }
+                                @foreach (string URL in _imagesConvertedToBase64)
+                                {
+                                    <MudButton Class="z-26">
+                                        <MudImage ObjectFit="ObjectFit.Cover" Height="100" Width="100" Src="@URL" Alt="zdjęcie" Elevation="25" Class="rounded-lg" />
+                                        <MudIconButton OnClick="() => DeleteImage(URL)" Icon="@Icons.Material.Filled.Delete" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Medium" Class="z-30" Style="position:absolute; right:0px; top:0px;" />
+                                    </MudButton>
+                                }
+                            </MudStack>
+                        <MudText Typo="Typo.h6">
+                            @if (Message != "")
+                            {
+
+                                <MudAlert Severity="Severity.Error">@Message</MudAlert>
+
+                            }
+                        </MudText>
+                         
+
+                    </MudPaper>
+                </ButtonTemplate>
+            </MudFileUpload>
+            <MudStack Style="padding-top: 25px;padding-bottom: 25px">
+                <MudTextField T="string" @bind-Value="part.Description" Label="Opis Cześci" Variant="Variant.Filled" Lines="5" />
+            </MudStack>
+            <MudStack Row="true" Style="marging-top:20px;" Justify="Justify.FlexEnd">
+                <MudButton Variant="Variant.Filled" OnClick="@Clear" Color="Color.Default" Style="margin:10px;">Wyczyść</MudButton>
+                <MudButton Variant="Variant.Filled" OnClick="@PostSiteContent" EndIcon="@Icons.Material.Filled.Send" Style="margin:10px;" Color="Color.Primary">Dodaj</MudButton>
+            </MudStack>
+            @if (ShowSuccessMessage)
+            {
+                <MudAlert Severity="Severity.Success">@SuccessMessage</MudAlert>
+            }
+            @if (ShowFailMessage)
+            {
+                <MudAlert Severity="Severity.Error">@FailMessage</MudAlert>
+            }
+
+                
+            </MudCardContent>
+        </MudCard>
+
+
+        
+    </MudStack>
+
+@code {
+    public string ProductName { get; set; }
+    public string PartDescryption { get; set; }
+    public int CarId { get; set; }
+    public string Model { get; set; }
+    public string Brand { get; set; }
+    public int YearOfProduction { get; set; }
+    public double Price { get; set; }
+    public string CarName { get; set; }
+    public bool IsPartWipeoutCar { get; set; } = false;
+    public bool LetSaveData { get; set; }
+    public string PriceWithPrefix { get; set; }
+    public Part part = new Part();
+    public Part newPart = new Part();
+    public IEnumerable<Part> parts = new List<Part>();
+    public IEnumerable<Vehicle> vehicles = new List<Vehicle>();
+    private List<string> CarNames = new List<string>();
+    public Warehouse warehouse { get; set; } = new Warehouse();
+    public Area area { get; set; } = new Area();
+    public string SuccessMessage { get; set; }
+    public string FailMessage { get; set; }
+    public bool ShowSuccessMessage { get; set; } = false;
+    public bool ShowFailMessage { get; set; } = false;
+    public CarScrapyardWarehouse.Shared.Models.Position position { get; set; } = new CarScrapyardWarehouse.Shared.Models.Position();
+
+
+    public IEnumerable<Part> test { get; set; }
+    public MyDefaultConverter<int?> _converter = new();
+    private List<IBrowserFile> _images = new();
+    private List<string> _imagesConvertedToBase64 = new();
+    private const string DefaultDragClass = "relative rounded-lg border-2 border-dashed pa-4 mt-4 mud-width-full mud-height-full z-25";
+    private string _dragClass = DefaultDragClass;
+    public string imgSrc = "";
+    byte[] _fileBytes = null;
+    public string Message = "";
+    public bool IsWarehouseContainingAreas { get; set; } = true;
+    public bool IsAreaContainingPositions { get; set; } = true;
+    public IEnumerable<Warehouse> warehouses = new List<Warehouse>();
+    public IEnumerable<Area> areas = new List<Area>();
+    public IEnumerable<CarScrapyardWarehouse.Shared.Models.Position> positions = new List<CarScrapyardWarehouse.Shared.Models.Position>();
+    public List<Warehouse> SelectedWarehouses = new List<Warehouse>();
+    public List<Area> SelectedAreas = new List<Area>();
+    public List<Area> SelectedArea = new List<Area>();
+    public List<CarScrapyardWarehouse.Shared.Models.Position> SelectedPosition = new List<CarScrapyardWarehouse.Shared.Models.Position>();
+    public List<CarScrapyardWarehouse.Shared.Models.Position> SelectedPositions = new List<CarScrapyardWarehouse.Shared.Models.Position>();
+    public AuthenticationState authState;
+    public System.Security.Claims.ClaimsPrincipal user = new System.Security.Claims.ClaimsPrincipal();
+
+    public Area tempArea = new Area();
+    public CarScrapyardWarehouse.Shared.Models.Position tempPosition = new CarScrapyardWarehouse.Shared.Models.Position();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetAllData();
+
+
+    }
+    public async Task GetAllData()
+    {
+        try
+        {
+            await GetWarehouses();
+            await GetAreas();
+            await GetPositions();
+            await GetParts();
+            await GetCarsNames();
+            authState = (await AuthenticationStateProvider.GetAuthenticationStateAsync());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+    public void OnCarSelection(Vehicle Car)
+    {
+        part.IdVehicle = Car.Id;
+    }
+
+    public bool validateData()
+    {
+
+        if (IsPartWipeoutCar == true)
+        {
+            part.IdVehicle = null;
+        }
+        else
+        {
+            if(part.IdVehicle == null)
+            {
+                return false;
+            }
+        }
+        if (part.Name == null)
+        {
+            return false;
+        }
+        if(position != null)
+        {
+            part.IdPosition = position.Id;
+        }
+        else
+        {
+            return false;
+        }
+        return true;
+    }
+
+    public async void PostSiteContent()
+    {
+        if (authState != null && authState.User != null)
+        {
+            var userr = authState.User;
+            part.User = userr.Identity.Name;
+        }
+        ShowFailMessage = false;
+        LetSaveData = validateData();
+        part.IdCategory = 2;
+        part.InsertDate = System.DateTime.Now;
+        if (LetSaveData)
+        {
+            Part newPart;
+            part.IdCategory = null;
+            newPart = await VehicleService.InsertPart(part);
+            byte[] imageBytes = null;
+            foreach (var image in _images)
+            {
+                using (var ms = new MemoryStream())
+                {
+                    await image.OpenReadStream(10 * 1024 * 1024).CopyToAsync(ms);
+                    imageBytes = ms.ToArray();
+                    await VehicleService.AddImageToPart(newPart.Id, imageBytes);
+                }
+            };
+
+            await Task.Delay(1200);
+            AddSnackbar("Pomyślnie przyjęto część", Severity.Success);
+        }
+        else
+        {
+            ShowFailMessage = true;
+            FailMessage = "Błąd zapisu - upewnij się że wszystkie wymagane pola zostały wypełnione";
+        }
+
+    }
+    //void RefreshPage() => NavigationManage.NavigateTo(NavigationManage.Uri, true);
+    public async Task GetParts()
+    {
+        parts = await VehicleService.GetParts();
+    }
+
+    public void DeleteImage(string url)
+    {
+        int index = _imagesConvertedToBase64.IndexOf(url);
+        _images.RemoveAt(index);
+        _imagesConvertedToBase64.RemoveAt(index);
+        StateHasChanged();
+    }
+    public async Task resetMessage()
+    {
+        await Task.Delay(10000);
+        Message = "";
+        StateHasChanged();
+    }
+    public async Task OnDropFile(InputFileChangeEventArgs e)
+    {
+        ClearDragClass();
+        var files = e.GetMultipleFiles();
+        foreach (var file in files)
+        {
+
+            Message = "";
+
+            if (_images.Count >= 8)
+            {
+                Message = "Maksymalna liczba zdjęć które możesz dodać to 8";
+                resetMessage();
+                return;
+            }
+
+            string fileName = file.Name;
+            string fileExtension = System.IO.Path.GetExtension(fileName);
+
+            foreach (var name in _images)
+            {
+                if (fileName == name.Name)
+                {
+                    Message = "Zdjęcie o nazwie '" + fileName + "' jest już dodane ";
+                    resetMessage();
+                    return;
+                }
+            }
+
+            if (fileExtension != ".jpg")
+            {
+                Message = "Plik musi mieć rozszerzenie .jpg";
+                resetMessage();
+                return;
+            }
+
+            _images.Add(file);
+            using (var ms = new MemoryStream())
+            {
+
+                await file.OpenReadStream(10 * 1024 * 1024).CopyToAsync(ms);
+                _fileBytes = ms.ToArray();
+                var photo = GetImage(Convert.ToBase64String(_fileBytes));
+                imgSrc = string.Format("data:image/jpg;base64,{0}", Convert.ToBase64String(photo));
+                _imagesConvertedToBase64.Add(imgSrc);
+            }
+        }
+    }
+    public byte[] GetImage(string sBase64String)
+    {
+        byte[] bytes = null;
+
+        if (!string.IsNullOrEmpty(sBase64String))
+        {
+            bytes = Convert.FromBase64String(sBase64String);
+        }
+        return bytes;
+    }
+
+    private void SetDragClass()
+        => _dragClass = $"relative rounded-lg border-2 mud-border-success border-dashed pa-4 mt-4 mud-width-full mud-height-full z-25;";
+
+    private void ClearDragClass()
+        => _dragClass = DefaultDragClass;
+
+    private async Task GetCarsNames()
+    {
+        vehicles = await VehicleService.GetVehicles();
+        foreach( var vechicle in vehicles)
+        {
+            CarNames.Add(vechicle.Vin); // <-- zmień vim na coś innego - nwm zapytaj?
+        }
+    }
+
+    private void Clear()
+    {
+        part.Name = null;
+        part.Price = null;
+        part.Description = null;
+        part.IdVehicle = null;
+        _imagesConvertedToBase64.Clear();
+    }
+
+    private async Task<IEnumerable<string>> SearchForCars(string value)
+    {
+        // In real life use an asynchronous function for fetching data from an api.
+        await Task.Delay(5);
+
+        // if text is null or empty, show complete list
+        if (string.IsNullOrEmpty(value))
+            return CarNames;
+        return CarNames.Where(x => x.Contains(value, StringComparison.InvariantCultureIgnoreCase));
+    }
+    public async Task GetWarehouses()
+    {
+        warehouses = await WarehouseService.GetWarehouses();
+        foreach (var item in warehouses)
+        {
+            SelectedWarehouses.Add(item);
+        }
+    }
+    public async Task GetAreas()
+    {
+        areas = await WarehouseService.GetAreas();
+        foreach (var item in areas)
+        {
+            SelectedAreas.Add(item);
+        }
+    }
+    public async Task GetPositions()
+    {
+        positions = await WarehouseService.GetPositions();
+        foreach (var item in positions)
+        {
+            SelectedPositions.Add(item);
+        }
+    }
+    public void setAreaWarehouseId(Warehouse currWarehouse)
+    {
+        warehouse.Id = currWarehouse.Id;
+        area.IdWarehouse = currWarehouse.Id;
+    }
+    public void setPositionAreaId(Area currArea)
+    {
+        area.Id = currArea.Id;
+        position.IdArea = currArea.Id;
+    }
+    public void setPositionId(CarScrapyardWarehouse.Shared.Models.Position currPosition)
+    {
+        position.Id = currPosition.Id;
+    }
+    public void filterAreasForCurrentWarehouseSelected(Warehouse currWarehouse)
+    {
+        SelectedArea = SelectedAreas.Where(item => item.IdWarehouse == currWarehouse.Id).ToList();
+        IsWarehouseContainingAreas = true;
+        if (SelectedArea.Count() == 0)
+        {
+            tempArea.AreaName = "Magazyn nie posiada regałów";
+            SelectedArea.Add(tempArea);
+            IsWarehouseContainingAreas = false;
+        }
+        setAreaWarehouseId(currWarehouse);
+
+    }
+    public void filterPositionForCurrentAreaSelected(Area currArea)
+    {
+        SelectedPosition = SelectedPositions.Where(item => item.IdArea == currArea.Id).ToList();
+        IsAreaContainingPositions = true;
+        if (SelectedPosition.Count() == 0)
+        {
+            tempPosition.PositionName = "Regał nie posiada pozycji";
+            SelectedPosition.Add(tempPosition);
+            IsAreaContainingPositions = false;
+        }
+        setPositionAreaId(currArea);
+
+    }
+
+    protected void AddSnackbar(string message, Severity severity)
+    {
+        Snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+        Snackbar.Add(message, severity);
+    }
+}

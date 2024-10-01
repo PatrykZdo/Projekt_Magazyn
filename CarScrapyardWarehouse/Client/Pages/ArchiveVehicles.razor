@@ -1,0 +1,102 @@
+﻿@page "/archiveVehicles"
+@using CarScrapyardWarehouse.Shared.Models;
+@inject IJSRuntime JSRuntime
+
+
+<PageTitle>Archiwum Części</PageTitle>
+@if (!isLoaded)
+{
+    <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Style="height:100vh; width:100%;">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    </MudStack>
+}
+else
+{
+    <MudText Class="mt-8 d-flex justify-content-center align-items-center" Typo="Typo.h6">Archiwum Pojazdy</MudText>
+
+    <MudDataGrid Style="margin:15px"
+                 Items=@archivedVehicles
+                 SortMode="SortMode.Multiple"
+                 Filterable="false"
+                 ReadOnly="true"
+                 Hover=true
+                 Class="mt-5">
+        <Columns>
+            <HierarchyColumn />
+           
+            <PropertyColumn Property="x => x.Brand" Title="Marka" />
+
+            <PropertyColumn Property="x => x.Model" Title="Model" />
+            <PropertyColumn Property="x => x.Year" Title="Rocznik" />
+            <PropertyColumn Property="x => x.PurchasePrice" Title="Cena zakupu (w zł)" />
+            <PropertyColumn Property="x => x.InsertDate" Title="Data archiwizacji" />
+            <TemplateColumn CellClass="d-flex justify-end" Sortable="false" Filterable="false">
+                <CellTemplate>
+                    <MudStack Row>
+                        <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" @onclick ="() => RestoreVehicle(context.Item)">
+                            @if(!isDeleting){
+                                <MudText>Przywróć</MudText>
+                            }
+                            else
+                            {
+                                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small"/>
+                            }
+                        </MudButton>
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <ChildRowContent>
+            <MudCard>
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">@context.Item.Brand @context.Item.Model @context.Item.Year - @context.Item.Vin</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Class="mt-3 fw-bold">Zdjęcia</MudText>
+                    <MudItem Class="mt-3 d-flex">
+                        @foreach(var image in context.Item.VehicleImages)
+                        {
+                            <MudImage Src="@(string.Format($"data:image/png;base64,{Convert.ToBase64String(image.IdImageNavigation.Image1)}"))" Alt="Vehicle's Photo'" Elevation="25" Width="200" Height="150" Class="rounded-lg" />
+                        } 
+                    </MudItem>
+                    <MudText Class="mt-3 fw-bold">Dodatkowe informacje</MudText>
+                    <MudChipSet >
+                        @foreach (var attribute in context.Item.VehicleAttributeValues)
+                        {
+                            <MudChip Variant="Variant.Text" Color="Color.Primary" Value="@(attribute.Value)">@(attribute.IdAttributeNavigation.AttriburteName): @(attribute.Value)</MudChip>
+                        }
+                    </MudChipSet>
+                </MudCardContent>
+            </MudCard>
+        </ChildRowContent>
+
+        <PagerContent>
+            <MudDataGridPager T="Vehicle" RowsPerPageString="Liczba wierszy" InfoFormat="@infoFormat"/>
+        </PagerContent>
+    </MudDataGrid>
+}
+
+@code {
+
+    public List<Vehicle> archivedVehicles = new List<Vehicle>();
+    public Boolean isLoaded = false;
+    public Boolean isDeleting = false;
+    private string infoFormat = "{first_item}-{last_item} z {all_items}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        archivedVehicles = (await VehicleService.GetArchivedVehicles()).ToList();
+        isLoaded = true;
+    }
+
+    public async Task RestoreVehicle(Vehicle vehicle)
+    {
+        isDeleting = true;
+        vehicle.Archived = false;
+        await VehicleService.UpdateVehicle(vehicle);
+        archivedVehicles = (await VehicleService.GetArchivedVehicles()).ToList();
+        isDeleting = false;
+    }
+}
